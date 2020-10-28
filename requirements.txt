@@ -1,0 +1,11 @@
+pandas
+numpy
+math
+pylab
+scipy
+cartopy
+mpl_toolkits
+matplotlib
+requests
+io
+dateutil
