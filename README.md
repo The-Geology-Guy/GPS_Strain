@@ -38,6 +38,13 @@ This project is an open project, and contributions are welcome from any individu
 
 -----
 
+# DATA RESOURCES
+
+- [UNAVCO Web Services](https://www.unavco.org/data/web-services/documentation/documentation.html#!/GNSS47GPS/getPositionByStationId) is used for the station locations and relative station velocity.
+- [Stamen Map Tile Sets](http://maps.stamen.com/#watercolor/12/37.7706/-122.3782) are used to generate the maps in this package. The Stamen map tile sets are copyright Stamen Design, under a Creative Commons Attribution (CC BY 3.0) license.
+
+-----
+
 # HOW TO USE THIS REPOSITORY
 
 ## TABLE OF CONTENTS
