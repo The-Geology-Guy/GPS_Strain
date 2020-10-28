@@ -122,7 +122,7 @@ alaska_sites
 
 ```
 
-![image](Finished_Maps/Alaska.png)
+![image](images/Finished_Maps/Alaska.png)
 
 ### <a name="section1.1.1">1.1.1&nbsp;&nbsp;&#8239; Get Site Data for Individual Sites</a>
 
@@ -139,7 +139,7 @@ our_sites
 
 ```
 
-> ![image](Finished_Maps/AC63_vel.png)
+> ![image](images/Finished_Maps/AC63_vel.png)
 
 ### <a name="section1.2">1.2&nbsp;&nbsp;&#8239; Process Site Data</a>
 
@@ -165,11 +165,7 @@ strain_output.primary_data
 
 ```
 
-> ![image](Finished_Maps/AC63_tv.png)
-
-<div style="page-break-after: always;"></div>
-
-<p>&nbsp;</p>
+> ![image](images/Finished_Maps/AC63_tv.png)
 
 ### <a name="section1.2.2">1.2.2&nbsp;&nbsp; Find the Left Stretch Tensor</a>
 
@@ -203,7 +199,7 @@ strain_viz_.def_ellipse(V=strain_output.left_stretch_tensor)
 
 ```
 
-![image](Finished_Maps/AC63_strain_ellipse.png)
+![image](images/Finished_Maps/AC63_strain_ellipse.png)
 
 ### <a name="section1.3.2">1.3.2&nbsp;&nbsp; View the Strain Ellipse on a Map via Cartopy</a>
 
@@ -213,7 +209,7 @@ strain_viz_.ellipse_plot(V=strain_output.left_stretch_tensor, bounds=0.125)
 
 ```
 
-![image](Finished_Maps/AC63_strain_map.png)
+![image](images/Finished_Maps/AC63_strain_map.png)
 
 ### <a name="section1.3.3">1.3.3&nbsp;&nbsp; Strain Ellipse Map with Legend and Data</a>
 
@@ -223,7 +219,7 @@ strain_viz_.strain_map_full(V=strain_output.left_stretch_tensor, tiler_size=10, 
 
 ```
 
-<p align="center"><img src="Finished_Maps/AC63_strain.jpg" width=800/></p>
+<p align="center"><img src="images/Finished_Maps/AC63_strain.jpg" width=800/></p>
 
 ### <a name="section1.3.4">1.3.4&nbsp;&nbsp; Plot the Map Symbol</a>
 
@@ -233,11 +229,11 @@ strain_viz_.map_symbol(strain_output.e1_2[0], strain_output.e1_2[1], rot=-strain
 
 ```
 
-![image](Finished_Maps/AC63_symbol_only.png)
+![image](images/Finished_Maps/AC63_symbol_only.png)
 
 #### All possible symbols based on $e_{1H}$ and $e_{2H}$
 
-![image](Finished_Maps/Symbol_Types.png)
+![image](images/Finished_Maps/Symbol_Types.png)
 
 ### <a name="section1.3.5">1.3.5&nbsp;&nbsp; View the Map Symbol on a Map via Cartopy</a>
 
@@ -248,7 +244,7 @@ strain_viz_.symbol_map(e1=strain_output.e1_2[0], e2=strain_output.e1_2[1],
 
 ```
 
-![image](Finished_Maps/AC63_symbol_map.png)
+![image](images/Finished_Maps/AC63_symbol_map.png)
 
 ### <a name="section1.3.6">1.3.6&nbsp;&nbsp; Map Symbol plotted with Legend and Strain Ellipse</a>
 
@@ -261,7 +257,7 @@ strain_viz_.symbol_map_full(V=strain_output.left_stretch_tensor, tiler_size=10,
 
 ```
 
-![image](Finished_Maps/AC63_symbol.jpg)
+![image](images/Finished_Maps/AC63_symbol.jpg)
 
 ## <a name="section2">2&nbsp;&nbsp;&nbsp; EXAMPLES USING UNAVCO DATA</a>
 
@@ -281,7 +277,7 @@ california_sites
 
 ```
 
-![image](Finished_Maps/California.png)
+![image](images/Finished_Maps/California.png)
 
 ### <a name="section2.1.1">2.1.1&nbsp;&nbsp;&#8239; Utah</a>
 
@@ -295,7 +291,7 @@ utah_sites
 
 ```
 
-![image](Finished_Maps/Utah.png)
+![image](images/Finished_Maps/Utah.png)
 
 ### <a name="section2.2">2.2&nbsp;&nbsp;&#8239; Mapping the Sites</a>
 
@@ -317,7 +313,7 @@ strain_output.primary_data
 
 ``` 
 
->![image](Finished_Maps/AC11.png)
+>![image](images/Finished_Maps/AC11.png)
 
 ``` python
 # Instantiate the strain_viz class to use the site data queried earlier
@@ -329,7 +325,7 @@ strain_viz_0.strain_map_full(V=strain_output.left_stretch_tensor, tiler_size=10,
 
 ```
 
-<p align="center"><img src="Finished_Maps/AC11_strain.jpg" width=800/></p>
+<p align="center"><img src="images/Finished_Maps/AC11_strain.jpg" width=800/></p>
 
 ``` python
 # Plot the entire map with components.
@@ -342,7 +338,7 @@ strain_viz_0.symbol_map_full(V=strain_output.left_stretch_tensor,
 
 ```
 
-![image](Finished_Maps/AC11_symbol.jpg)
+![image](images/Finished_Maps/AC11_symbol.jpg)
 
 
 ### <a name="section2.2.1">2.2.1&nbsp;&nbsp;&#8239; GPS Sites ['P550', 'PPBF', 'P615']</a>
@@ -363,7 +359,7 @@ strain_output.primary_data
 
 ```
 
->![image](Finished_Maps/P550.png)
+>![image](images/Finished_Maps/P550.png)
 
 ``` python
 # Instantiate the strain_viz class to use the site data queried earlier
@@ -374,7 +370,7 @@ strain_viz_1.strain_map_full(V=strain_output.left_stretch_tensor, tiler_size=8, 
                              size=15, label='15 mm/yr', scale_arrow=70, hei_=2, length=100, bounds=0.7)
 
 ```
-<p align="center"><img src="Finished_Maps/P550_strain.jpg" width=800/></p>
+<p align="center"><img src="images/Finished_Maps/P550_strain.jpg" width=800/></p>
 
 
 ``` python
@@ -388,7 +384,7 @@ strain_viz_1.symbol_map_full(V=strain_output.left_stretch_tensor,
 
 ```
 
-![image](Finished_Maps/P550_symbol.jpg)
+![image](images/Finished_Maps/P550_symbol.jpg)
 
 ### <a name="section2.2.2">2.2.2&nbsp;&nbsp; GPS Sites ['P146', 'P142', 'P090']</a>
 
@@ -408,7 +404,7 @@ strain_output.primary_data
 
 ```
 
->![image](Finished_Maps/P146.png)
+>![image](images/Finished_Maps/P146.png)
 
 ``` python
 # Instantiate the strain_viz class to use the site data queried earlier
@@ -420,7 +416,7 @@ strain_viz_2.strain_map_full(V=strain_output.left_stretch_tensor, tiler_size=10,
 
 ```
 
-<p align="center"><img src="Finished_Maps/P146_strain.jpg" width=800/></p>
+<p align="center"><img src="images/Finished_Maps/P146_strain.jpg" width=800/></p>
 
 ``` python
 # Plot the entire map with components.
@@ -433,7 +429,7 @@ strain_viz_2.symbol_map_full(V=strain_output.left_stretch_tensor,
 
 ```
 
-![image](Finished_Maps/P146_symbol.jpg)
+![image](images/Finished_Maps/P146_symbol.jpg)
 
 ### <a name="section2.2.3">2.2.3&nbsp;&nbsp; GPS Sites ['WIKR', 'AC75', 'AC33']</a>
 
@@ -453,7 +449,7 @@ strain_output.primary_data
 
 ```
 
->![image](Finished_Maps/WIKR.png)
+>![image](images/Finished_Maps/WIKR.png)
 
 ``` python
 # Instantiate the strain_viz class to use the site data queried earlier
@@ -465,7 +461,7 @@ strain_viz_3.strain_map_full(V=strain_output.left_stretch_tensor, tiler_size=10,
 
 ```
 
-<p align="center"><img src="Finished_Maps/WIKR_strain.jpg" width=800/></p>
+<p align="center"><img src="images/Finished_Maps/WIKR_strain.jpg" width=800/></p>
 
 ``` python
 # Plot the entire map with components.
@@ -478,11 +474,7 @@ strain_viz_3.symbol_map_full(V=strain_output.left_stretch_tensor,
 
 ```
 
-![image](Finished_Maps/WIKR_symbol.jpg)
-
-<div style="page-break-after: always;"></div>
-
-<p>&nbsp;</p>
+![image](images/Finished_Maps/WIKR_symbol.jpg)
 
 ### <a name="section2.2.4">2.2.4&nbsp;&nbsp; GPS Sites ['P116', 'P088', 'COON']</a>
 
@@ -502,7 +494,7 @@ strain_output.primary_data
 
 ```
 
->![image](Finished_Maps/P116.png)
+>![image](images/Finished_Maps/P116.png)
 
 ``` python
 # Instantiate the strain_viz class to use the site data queried earlier
@@ -515,7 +507,7 @@ strain_viz_4.strain_map_full(V=strain_output.left_stretch_tensor, tiler_size=10,
 
 ```
 
-<p align="center"><img src="Finished_Maps/P116_strain.jpg" width=800/></p>
+<p align="center"><img src="images/Finished_Maps/P116_strain.jpg" width=800/></p>
 
 ``` python
 # Plot the entire map with components.
@@ -529,7 +521,7 @@ strain_viz_4.symbol_map_full(V=strain_output.left_stretch_tensor,
 
 ```
 
-![image](Finished_Maps/P116_symbol.jpg)
+![image](images/Finished_Maps/P116_symbol.jpg)
 
 ## <a name="section3">3&nbsp;&nbsp;&nbsp; DOCUMENTATION</a>
 
@@ -540,7 +532,7 @@ strain_viz_4.symbol_map_full(V=strain_output.left_stretch_tensor,
 
 #### from `geo_strain_calculator_local_v2` import `unavco_data`
 
-#### unavco_data(**kwargs)
+#### unavco_data(\*\*kwargs)
 - `start_time` (optional) -- the starting date in format ‘yyyy-mm-dd’
 - `end_time` (optional) -- the ending date in format ‘yyyy-mm-dd’
 
@@ -552,7 +544,7 @@ strain_viz_4.symbol_map_full(V=strain_output.left_stretch_tensor,
 - `minlat` -- the minimum latitude
 - `maxlat` -- the maximum latitude
 
-#### unavco_data(**kwargs).site_data(self, sites, **kwargs)
+#### unavco_data(\*\*kwargs).site_data(self, sites, \*\*kwargs)
 > Generates a pandas dataframe with all of the site information
 
 - `sites` (required) -- the three sites of interest in the form of a list
@@ -585,8 +577,8 @@ strain_viz_4.symbol_map_full(V=strain_output.left_stretch_tensor,
 | strain_data(data_unav).utm_p_z                                                         	| UTM 'pseudo' zone                                                               	|
 | strain_data(data_unav).a_wgs84<br>strain_data(data_unav).b_wgs84                          	| WGS84 datum                                                                     	|
 | strain_data(data_unav).k0                                                              	| k0 = 0.9996                                                                     	|
-| strain_data(data_unav).e                                                               	| math.sqrt(1-b_wgs84**2/a_wgs84**2)                                              	|
-| strain_data(data_unav).e_2                                                             	| ((e * a_wgs84)/b_wgs84)**2                                                      	|
+| strain_data(data_unav).e                                                               	| math.sqrt(1-b_wgs84\*\*2/a_wgs84\*\*2)                                              	|
+| strain_data(data_unav).e_2                                                             	| ((e * a_wgs84)/b_wgs84)\*\*2                                                      	|
 | strain_data(data_unav).n                                                               	| (a_wgs84 - b_wgs84)/(a_wgs84 + b_wgs84)                                         	|
 | strain_data(data_unav).rho                                                             	| Calculated rho                                                                  	|
 | strain_data(data_unav).nu                                                              	| Calculated nu                                                                   	|
@@ -649,7 +641,7 @@ _Note: This Python Function is an adaptation of Ondrej Lexa's GitHub repository_
 
 <p>&nbsp;</p>
 
-#### strain_viz(strain_data).def_field(self, V, **kwargs)
+#### strain_viz(strain_data).def_field(self, V, \*\*kwargs)
 > Creates a field
 
 - `V` (required) -- a deformation matrix (works with left or right stretch tensors or even the computed deformation matrix)
@@ -658,7 +650,7 @@ _Note: This Python Function is an adaptation of Ondrej Lexa's GitHub repository_
 
 <p>&nbsp;</p>
 
-#### strain_viz(strain_data).ellipse_plot(self, **kwargs)
+#### strain_viz(strain_data).ellipse_plot(self, \*\*kwargs)
 > Plots the Strain Ellipse on a map
 
 - `V` (optional, default == ‘off’) -- a deformation matrix (works with left or right stretch tensors or even the computed deformation matrix)
@@ -683,11 +675,7 @@ _Note: This Python Function is an adaptation of Ondrej Lexa's GitHub repository_
 
 <p>&nbsp;</p>
 
-<div style="page-break-after: always;"></div>
-
-<p>&nbsp;</p>
-
-#### strain_viz(strain_data).strain_map_full(self, **kwargs)
+#### strain_viz(strain_data).strain_map_full(self, \*\*kwargs)
 > Plots the strain ellipse on a map with legend and title
 
 - `V` (optional, default == ‘off’) -- a deformation matrix (works with left or right stretch tensors or even the computed deformation matrix)
@@ -726,7 +714,7 @@ _Note: This Python Function is an adaptation of Ondrej Lexa's GitHub repository_
 
 <p>&nbsp;</p>
 
-#### strain_viz(strain_data).map_symbol(self, e1, e2, **kwargs)
+#### strain_viz(strain_data).map_symbol(self, e1, e2, \*\*kwargs)
 > Plots map symbol
 
 - `e1` (required) -- e1 value
@@ -747,7 +735,7 @@ _Note: This Python Function is an adaptation of Ondrej Lexa's GitHub repository_
 
 <p>&nbsp;</p>
 
-#### strain_viz(strain_data).symbol_map(self, **kwargs)
+#### strain_viz(strain_data).symbol_map(self, \*\*kwargs)
 > Plots map symbol on a map
 
 - `e1` (required) -- e1 value
@@ -788,7 +776,7 @@ _Note: This Python Function is an adaptation of Ondrej Lexa's GitHub repository_
 
 <p>&nbsp;</p>
 
-#### strain_viz(strain_data).symbol_map_full(self, **kwargs)
+#### strain_viz(strain_data).symbol_map_full(self, \*\*kwargs)
 > Plots a map symbol on a map with a legend and title
 
 - `e1` (required) -- e1 value
