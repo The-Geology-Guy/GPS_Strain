@@ -36,19 +36,51 @@ This project is an open project, and contributions are welcome from any individu
 - [Vince Cronin](mailto:vince_cronin@baylor.edu) [![orcid](https://img.shields.io/badge/orcid-0000--0002--3069--6470-brightgreen.svg)](https://orcid.org/0000-0002-3069-6470)
 - [Phil Resor](mailto:presor@wesleyan.edu) [![orcid](https://img.shields.io/badge/orcid-0000--0003--3071--5085-brightgreen.svg)](https://orcid.org/0000-0003-3071-5085)
 
+### Tips for Contributing
+
+Issues and bug reports are always welcome.  Code clean-up, and feature additions can be done either through pull requests to [project forks]() or branches.
+
+All products of the SLAM project are licensed under an [MIT License](LICENSE) unless otherwise noted.
+
 -----
 
-# DATA RESOURCES
+## HOW TO USE THIS REPOSITORY
+
+This repository is available to be 
+
+Base overview for SLAM map generation (_see the [GPS_Strain Wiki](https://github.com/The-Geology-Guy/GPS_Strain/wiki) for more information_):
+1. Find GPS Sites -- _either using the `get_stations` function or simply find 3 on the UNAVCO site_
+2. Get site coordinates and velocities using the `site_data` function
+3. Process the strain data using the `strain_data` class
+4. Use the processed strain data to produce one of the two types of maps: (1) Strain Ellipse Map or (2) Map Symbol Map
+
+Once again, this is a simple overview of a typical GPS Strain task. This is in no way the limit of what can be done. See the [GPS_Strain Wiki](https://github.com/The-Geology-Guy/GPS_Strain/wiki) for more information.
+
+### System Requirements
+
+This project is developed using Python. There should be no issues with these projects running on Mac, Windows, or Linux. If there are any issues, please submit an issue and it will be investigated.
+
+### Data Resources used in GPS_Strain
+
+#### A. Data Sources
 
 - [UNAVCO Web Services](https://www.unavco.org/data/web-services/documentation/documentation.html#!/GNSS47GPS/getPositionByStationId) is used for the station locations and relative station velocity.  
 
-- [Stamen Map Tile Sets](http://maps.stamen.com/#watercolor/12/37.7706/-122.3782) are used to generate the maps in this package. The Stamen map tile sets are copyright Stamen Design, under a Creative Commons Attribution (CC BY 3.0) license.
+#### B. Physical Maps
+
+- [Stamen Map Tile Sets](http://maps.stamen.com/#watercolor/12/37.7706/-122.3782) are used to generate the physical maps in this package. The Stamen map tile sets are copyright Stamen Design, under a Creative Commons Attribution (CC BY 3.0) license.
+
+### Key Outputs
+
+GPS_Strain provides the user a map with seismo-lineament bounds defined. Below are two examples:
+
+#### Example of a Strain Ellipse Map with Legend and Data
+<p align="center"><img src="images/Finished_Maps/AC63_strain.jpg" width=800/></p>
+
+#### Example of a Map Symbol plotted with Legend and Strain Ellipse
+![image](images/Finished_Maps/AC63_symbol.jpg)
 
 -----
-
-# HOW TO USE THIS REPOSITORY
-
-
 
 ## <a name="section9">REFERENCES</a>
 
