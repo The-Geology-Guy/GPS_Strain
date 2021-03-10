@@ -13,7 +13,7 @@ _Last Updated: October 2020_
 
 # PROJECT OVERVIEW
 
-The `GPS_Strain` Python package is a simple translation of the methods developed by Vince Cronin and Phil Resor. The purpose of this package is to make the method available to those who are interested in GPS and infinitesimal strain analysis and are more comfortable using Python.
+The `GPS_Strain` Python package is a translation of the methods developed by Vince Cronin and Phil Resor. The purpose of this package is to make the method available to those who are interested in GPS and infinitesimal strain analysis and are more comfortable using Python.
 
 _From [the GETSI teaching materials](https://serc.carleton.edu/getsi/teaching_materials/gps_strain/unit4.html):_
 
