@@ -47,7 +47,9 @@ Run on a normal connection on 18 Nov 2026 (`gps-strain P146 P149 P150 -o tahoe`,
 
 ## gps-strain.org (web app)
 
-Built to match **geoslam.org**: the same Windows-98 toolkit, desktop and mobile layouts, and Cronin reviewing the site before it is indexed. The solver is small enough to port to JavaScript or to run with Pyodide.
+Built to match **geoslam.org**: the same Windows-98 toolkit, desktop and mobile layouts, and Cronin reviewing the site before it is indexed.
+
+**Scope (decided 18 Nov 2026): United States only for now** (CONUS, Alaska, Hawaii, Puerto Rico and territories, matching USGS 3DEP and Quaternary-fault coverage). Stations outside it are not offered; terrain comes from USGS 3DEP and faults from the USGS database only, so Copernicus and GEM are not used on the site. The Python package stays global. The solver is small enough to port to JavaScript or to run with Pyodide.
 
 - **Data:** mirror `midas.NA.txt` to JSON on the same domain with a scheduled job, since NGL may not allow direct browser requests.
 - **Basemap:** the same as geoslam.org: USGS The National Map tiles (topo default, shaded relief, imagery) plus OpenStreetMap, in MapLibre.
