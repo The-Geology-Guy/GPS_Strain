@@ -35,7 +35,8 @@ def main(argv=None):
     p.add_argument("--format", default="pdf", choices=["pdf", "png", "svg"])
     p.add_argument("--map", default="both", choices=["both", "symbol", "strain"])
     p.add_argument("--basemap", default="esri-terrain",
-                   help="esri-terrain, stadia-terrain-background, esri-shaded-relief, esri-physical, "
+                   help="esri-terrain, stadia-terrain-background, usgs-relief, usgs-topo, usgs-imagery, "
+                        "esri-shaded-relief, esri-physical, "
                         "opentopomap, synthetic (offline preview) or none")
     p.add_argument("--api-key", help="basemap API key (or set STADIA_API_KEY / ESRI_API_KEY)")
     p.add_argument("--logo", help="logo image file or URL for the map sheets")

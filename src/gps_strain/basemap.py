@@ -19,6 +19,10 @@ Providers
     distribute, Esri requires an ArcGIS Location Platform account and API key
     (env ``ESRI_API_KEY``; 2 million basemap tiles/month free, then
     $0.15 per 1,000). Keyless use is only for holders of an ArcGIS licence.
+``usgs-relief``, ``usgs-topo``, ``usgs-imagery``
+    USGS The National Map basemaps (the same tiles the GEOSLAM web app uses).
+    US government works: public domain, no key, no print restrictions.
+    Coverage is the United States and territories only.
 ``esri-shaded-relief``, ``esri-physical``, ``esri-imagery``, ``opentopomap``
     Alternatives. All require the attribution printed on the map (done
     automatically).
@@ -72,6 +76,24 @@ PROVIDERS = {
         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}",
         "Basemap: Esri World Terrain Base — Sources: Esri, USGS, NOAA",
         max_zoom=13,
+    ),
+    "usgs-relief": TileProvider(
+        "usgs-relief",
+        "https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer/tile/{z}/{y}/{x}",
+        "Basemap: USGS The National Map (public domain)",
+        max_zoom=13,
+    ),
+    "usgs-topo": TileProvider(
+        "usgs-topo",
+        "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}",
+        "Basemap: USGS The National Map (public domain)",
+        max_zoom=16,
+    ),
+    "usgs-imagery": TileProvider(
+        "usgs-imagery",
+        "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}",
+        "Basemap: USGS The National Map (public domain)",
+        max_zoom=16,
     ),
     "esri-shaded-relief": TileProvider(
         "esri-shaded-relief",

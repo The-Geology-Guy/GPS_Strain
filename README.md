@@ -71,6 +71,7 @@ plotting.strain_map(r, sta, "strain.pdf", basemap="stadia-terrain-background")
 |---|---|---|
 | `esri-terrain` (default) | Hillshade, tan/green land, blue water: closest to Stamen terrain-background | A distributed app needs an ArcGIS Location Platform key (`ESRI_API_KEY`); 2M tiles/month free |
 | `stadia-terrain-background` | The exact Stamen style the 2020 maps used | Stadia key (`STADIA_API_KEY`). The free tier is non-commercial; paid plans start at $20/mo. Print rights are limited (see `docs/research/04_costs.md`). |
+| `usgs-relief`, `usgs-topo`, `usgs-imagery` | USGS The National Map (as used by the GEOSLAM web app) | Public domain, no key, printing allowed; **US and territories only** |
 | `esri-shaded-relief`, `esri-physical`, `esri-imagery`, `opentopomap` | Alternatives | Attribution printed automatically |
 | `synthetic` | Offline procedural preview | None |
 

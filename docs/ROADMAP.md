@@ -27,11 +27,16 @@ Run `gps-strain P146 P149 P150 -o tahoe --format png` once on a normal connectio
 
 1. Live smoke test of MIDAS, `.tenv3` and tiles. Add a real `midas.NA.txt` excerpt as a test fixture.
 2. Logo: get the official EarthScope logo (check EarthScope's usage terms) and pass it with `--logo`, or bundle it. The default data is NGL MIDAS, so match the logo to the data source.
-3. Basemap licence decision (see `docs/research/04_costs.md`): Esri Location Platform key (free at this scale; terms silent on printing), or a Stadia paid plan for the exact Stamen look (print rights only clearly cover its static-map product, so email Stadia first).
-4. Second validation case from the GETSI Excel calculator and Tohoku results, at `https://cdn.serc.carleton.edu/files/getsi/teaching_materials/gps_strain/` (`gps_strain_calculator_excel.v3.xls`, `gps_strain_calculator_results.xlsx`). Cross-check against Strain_2D (`delaunay_flat`).
-5. Networks: Delaunay triangulation over many stations, skinny-triangle filter, strain map.
-6. Optional EarthScope/GAGE NAM14 source (free login and token).
-7. GitHub Actions CI on Linux, Mac and Windows; publish to PyPI.
+3. **Licence-free terrain basemap (recommended):** do what GEOSLAM does for its printed maps and draw the terrain from a DEM hillshade:
+   - USGS 3DEP for the US, Copernicus GLO-30 on AWS globally, neither needing a key;
+   - add a hypsometric tint and water to get the Stamen terrain-background look with no tile licence at all.
+
+   `usgs-relief` / `usgs-topo` tiles (public domain, US only) are already available as basemaps.
+4. Basemap licence decision (see `docs/research/04_costs.md`): Esri Location Platform key (free at this scale; terms silent on printing), or a Stadia paid plan for the exact Stamen look (print rights only clearly cover its static-map product, so email Stadia first).
+5. Second validation case from the GETSI Excel calculator and Tohoku results, at `https://cdn.serc.carleton.edu/files/getsi/teaching_materials/gps_strain/` (`gps_strain_calculator_excel.v3.xls`, `gps_strain_calculator_results.xlsx`). Cross-check against Strain_2D (`delaunay_flat`).
+6. Networks: Delaunay triangulation over many stations, skinny-triangle filter, strain map.
+7. Optional EarthScope/GAGE NAM14 source (free login and token).
+8. GitHub Actions CI on Linux, Mac and Windows; publish to PyPI.
 
 ## gps-strain.org (web app)
 
