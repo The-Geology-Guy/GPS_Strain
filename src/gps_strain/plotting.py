@@ -221,8 +221,14 @@ def draw_basemap(ax, ext, basemap=DEFAULT_BASEMAP, tile_source=None, zoom=None, 
 
 
 def setup_map(ax, table, bounds=0.5, basemap=DEFAULT_BASEMAP, tile_source=None, zoom=None,
-              attribution=True, dem_source=None, terrain_style=None):
-    """Prepare a Web Mercator map axes with basemap and labelled lon/lat graticule."""
+              attribution=True, dem_source=None, terrain_style=None, max_width=None):
+    """Prepare a Web Mercator map axes with basemap and labelled lon/lat graticule.
+
+    ``max_width`` (Web Mercator metres) zooms the map in to at most that width,
+    centred on the stations, but never so far that the stations lose a margin
+    of :data:`STATION_PAD` of the map on each side (more at the top, under the
+    station legend).
+    """
     lon0, lon1, lat0, lat1 = map_extent(table, bounds)
     x0, y0 = bm.lonlat_to_merc(lon0, lat0)
     x1, y1 = bm.lonlat_to_merc(lon1, lat1)
@@ -237,6 +243,10 @@ def setup_map(ax, table, bounds=0.5, basemap=DEFAULT_BASEMAP, tile_source=None, 
     w = (sx1 - sx0) + 2 * pad
     h = max(w * box, (sy1 - sy0) + 0.6 * pad)
     w = max(w, h / box)
+    if max_width is not None and max_width < w:
+        w_min = max((sx1 - sx0) / (1 - 2 * STATION_PAD),
+                    (sy1 - sy0) / (1 - 2 * STATION_PAD - LEGEND_PAD) / box)
+        w = max(max_width, w_min)
     h = w * box
     cx, cy = (sx0 + sx1) / 2, (sy0 + sy1) / 2
     ext = (cx - w / 2, cx + w / 2, cy - h / 2, cy + h / 2)
@@ -268,6 +278,79 @@ def setup_map(ax, table, bounds=0.5, basemap=DEFAULT_BASEMAP, tile_source=None, 
                 color="0.25", zorder=60, fontfamily=SANS,
                 bbox=dict(boxstyle="square,pad=0.15", fc="w", ec="none", alpha=0.6))
     return ext
+
+
+STATION_PAD = 0.15     # map fraction kept clear around the stations when zooming in
+LEGEND_PAD = 0.05      # extra room at the top for the station legend
+ELLIPSE_FRAC = 0.11    # strain-ellipse radius, as a fraction of the map width (2020 layout)
+SYMBOL_FRAC = 0.085    # 300-nanostrain symbol half-length, as a fraction of the map width
+FIT_MARGIN = 1.12      # keep the glyph this much clear of the triangle sides
+
+
+def _hull(x, y):
+    """Convex hull of the stations (counter-clockwise), monotone chain."""
+    pts = sorted(set(zip(map(float, x), map(float, y))))
+    if len(pts) < 3:
+        return np.array(pts)
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower, upper = [], []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    return np.array(lower[:-1] + upper[:-1])
+
+
+def _sides_from_centroid(x, y):
+    """For each side of the station polygon: (unit normal, distance) from the
+    centroid (where the glyph is drawn) to that side, in map units."""
+    c = np.array([np.mean(x), np.mean(y)])
+    h = _hull(x, y)
+    out = []
+    for a, b in zip(h, np.roll(h, -1, axis=0)):
+        t = b - a
+        n = np.array([t[1], -t[0]]) / max(np.hypot(*t), 1e-12)
+        d = abs(np.dot(c - a, n))
+        out.append((n, d))
+    return out
+
+
+def ellipse_fit_width(result: StrainResult, table, frac=ELLIPSE_FRAC, margin=FIT_MARGIN):
+    """Largest map width (Web Mercator metres) at which the strain ellipse,
+    drawn with radius ``frac`` x map width at the centroid, stays inside the
+    station triangle. Uses the ellipse's support function: the drawing
+    (initial circle and deformed ellipse F = I + kE) reaches ``R max(1,
+    |F^T n|)`` toward a side with outward normal n."""
+    x, y = bm.lonlat_to_merc(table["lon"].to_numpy(float), table["lat"].to_numpy(float))
+    F = np.eye(2) + exaggeration_for(result) * result.strain_tensor
+    widths = [d / (frac * max(1.0, float(np.linalg.norm(F.T @ n))) * margin)
+              for n, d in _sides_from_centroid(x, y)]
+    return min(widths) if widths else None
+
+
+def symbol_fit_width(result: StrainResult, table, min_strain=0.1, max_strain=300.0,
+                     frac=SYMBOL_FRAC, margin=FIT_MARGIN):
+    """Largest map width at which the strain-rate symbol stays inside the
+    triangle (the symbol treated as a circle of its largest arm)."""
+    x, y = bm.lonlat_to_merc(table["lon"].to_numpy(float), table["lat"].to_numpy(float))
+    max_strain = max(max_strain, abs(result.e1) * NANO, abs(result.e2) * NANO)
+    reach = 0.0
+    for e in (result.e1, result.e2):
+        if abs(e) * NANO < min_strain:
+            continue
+        f = _symbol_fraction(e, min_strain, max_strain)
+        reach = max(reach, f if e > 0 else f + 0.06)  # contraction arrows start 0.06 out
+    if reach == 0:
+        return None
+    reach = math.hypot(reach, 0.17)  # arrow-head half width
+    return min(d / (frac * reach * margin) for _, d in _sides_from_centroid(x, y))
 
 
 def draw_triangle_and_sites(ax, table, colors=SITE_COLORS, legend_loc="upper center", ms=10):
@@ -340,9 +423,10 @@ WORDMARK = "GPS STRAIN"
 BLOCK = ["Arial Black", "Helvetica Neue", "Arial", "Liberation Sans", "DejaVu Sans"]
 
 
-def draw_logo(ax, logo=None):
+def draw_logo(ax, logo=None, align="center"):
     """Logo slot: an image file/URL, or by default the block-letter "GPS STRAIN" wordmark.
 
+    ``align="right"`` puts the logo's right edge on the slot's right edge.
     Pass ``logo=False`` to leave the slot empty.
     """
     ax.axis("off")
@@ -350,10 +434,13 @@ def draw_logo(ax, logo=None):
         return
     if logo is None or (isinstance(logo, str) and not logo.lower().endswith(
             (".png", ".jpg", ".jpeg", ".gif", ".tif", ".tiff", ".webp")) and "://" not in logo):
-        ax.text(0.5, 0.5, WORDMARK if logo is None else logo, transform=ax.transAxes, ha="center",
+        x, ha = (1.0, "right") if align == "right" else (0.5, "center")
+        ax.text(x, 0.5, WORDMARK if logo is None else logo, transform=ax.transAxes, ha=ha,
                 va="center", fontsize=40, fontweight="black", fontfamily=BLOCK, color="#9e2a2b")
         return
     ax.imshow(_load_logo(logo), aspect="equal")
+    if align == "right":
+        ax.set_anchor("E")
 
 
 # ---------------------------------------------------------------------------
@@ -455,16 +542,25 @@ def _default_title(data_label, one_line):
 
 def symbol_map(result: StrainResult, table, path=None, title=None, data_label="NGL MIDAS",
                logo=None, basemap=DEFAULT_BASEMAP, tile_source=None, dem_source=None, bounds=0.5,
-               scale_km=None, min_strain=0.1, max_strain=300.0, zoom=None, terrain_style=None):
-    """Landscape strain-rate symbol map (the 2020 ``symbol_map_full`` layout)."""
+               scale_km=None, min_strain=0.1, max_strain=300.0, zoom=None, terrain_style=None,
+               fit_symbol=True):
+    """Landscape strain-rate symbol map (the 2020 ``symbol_map_full`` layout).
+
+    With ``fit_symbol`` (default) the map zooms in, if needed, so the symbol
+    at the centroid stays inside the triangle; the symbol keeps its size on
+    the page. If the stations would not fit at that zoom, the symbol is drawn
+    smaller instead.
+    """
     with plt.rc_context({"font.family": SERIF}):
         fig = plt.figure(figsize=(20, 15))
         gs = fig.add_gridspec(30, 40, wspace=0.0, hspace=0.0, left=0.02, right=0.97, top=0.97, bottom=0.03)
         ax = fig.add_subplot(gs[:, 11:])
+        fit = symbol_fit_width(result, table, min_strain, max_strain) if fit_symbol else None
         setup_map(ax, table, bounds, basemap, tile_source, zoom, dem_source=dem_source,
-                  terrain_style=terrain_style)
+                  terrain_style=terrain_style, max_width=fit)
         x, y = draw_triangle_and_sites(ax, table)
-        size = 0.085 * (ax.get_xlim()[1] - ax.get_xlim()[0])
+        width = ax.get_xlim()[1] - ax.get_xlim()[0]
+        size = SYMBOL_FRAC * (min(width, fit) if fit else width)
         draw_strain_symbol(ax, result, (x.mean(), y.mean()), size, min_strain, max_strain)
         draw_scale_bar(ax, scale_km)
         draw_north_arrow(ax)
@@ -493,14 +589,21 @@ def symbol_map(result: StrainResult, table, path=None, title=None, data_label="N
 def strain_map(result: StrainResult, table, path=None, title=None, data_label="NGL MIDAS",
                velocity_label="Velocity Relative to North America", logo=None, basemap=DEFAULT_BASEMAP,
                tile_source=None, dem_source=None, bounds=0.5, scale_km=None, ref_velocity=None,
-               zoom=None, terrain_style=None):
-    """Portrait strain-ellipse map with velocities (the 2020 ``strain_map_full`` layout)."""
+               zoom=None, terrain_style=None, fit_ellipse=True):
+    """Portrait strain-ellipse map with velocities (the 2020 ``strain_map_full`` layout).
+
+    With ``fit_ellipse`` (default) the map zooms in, if needed, so the strain
+    ellipse at the centroid stays inside the triangle, as on the 2020 maps;
+    the ellipse keeps its size on the page (radius 11% of the map width). If
+    the stations would not fit at that zoom, the ellipse is drawn smaller.
+    """
     with plt.rc_context({"font.family": SERIF}):
         fig = plt.figure(figsize=(15, 20))
         gs = fig.add_gridspec(40, 30, left=0.03, right=0.97, top=0.98, bottom=0.02, wspace=0.4, hspace=0.35)
         ax = fig.add_subplot(gs[:30, :])
+        fit = ellipse_fit_width(result, table) if fit_ellipse else None
         setup_map(ax, table, bounds, basemap, tile_source, zoom, dem_source=dem_source,
-                  terrain_style=terrain_style)
+                  terrain_style=terrain_style, max_width=fit)
         x, y = draw_triangle_and_sites(ax, table)
         mx0, mx1 = ax.get_xlim()
         width = mx1 - mx0
@@ -513,7 +616,8 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
         k = 0.11 * width / vmax
         ax.quiver(x, y, ve, vn, angles="xy", scale_units="xy", scale=1 / k, color="k",
                   width=0.006, headwidth=3.5, headlength=4.5, headaxislength=4, zorder=45)
-        draw_ellipse(ax, result, center=(x.mean(), y.mean()), radius=0.11 * width, zorder=30)
+        radius = ELLIPSE_FRAC * (min(width, fit) if fit else width)
+        draw_ellipse(ax, result, center=(x.mean(), y.mean()), radius=radius, zorder=30)
         draw_scale_bar(ax, scale_km)
         draw_north_arrow(ax, loc=(0.085, 0.07))
 
@@ -521,7 +625,13 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
         ax_t.axis("off")
         ax_t.text(0.0, 0.45, title or _default_title(data_label, True), ha="left", va="center",
                   fontsize=24, transform=ax_t.transAxes)
-        draw_logo(fig.add_subplot(gs[30:33, 23:]), logo)
+        # right edge of the logo on the map's right axis line (not its tick labels)
+        ax.apply_aspect()
+        mpos = ax.get_position()
+        ax_logo = fig.add_subplot(gs[30:33, 23:])
+        lpos = ax_logo.get_position()
+        ax_logo.set_position([lpos.x0, lpos.y0, mpos.x1 - lpos.x0, lpos.height])
+        draw_logo(ax_logo, logo, align="right")
 
         ellipse_legend_box(fig.add_subplot(gs[33:37, :10]))
 

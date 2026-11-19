@@ -200,3 +200,90 @@ def test_map_survives_terrain_failure(tmp_path):
     assert any("Basemap unavailable" in s for s in texts)
     with pytest.raises(ValueError, match="unknown basemap"):
         plotting.symbol_map(r, t, None, basemap="esri-terrain")
+
+
+# --- glyphs stay inside the triangle (zoom in, don't shrink) ---------------------
+TAHOE = [dict(site="P146", lat=39.337463, lon=-120.537302, ve=-9.927, vn=8.814, sig_e=0.175, sig_n=0.156),
+         dict(site="P149", lat=39.602129, lon=-120.104977, ve=-8.553, vn=7.557, sig_e=0.217, sig_n=0.161),
+         dict(site="P150", lat=39.292380, lon=-120.033855, ve=-9.186, vn=8.139, sig_e=0.174, sig_n=0.160)]
+ALASKA = [dict(site="AC63", lat=63.502425, lon=-145.847246, ve=2.563, vn=1.006, sig_e=0.204, sig_n=0.195),
+          dict(site="AC62", lat=63.083606, lon=-146.312698, ve=-13.145, vn=8.035, sig_e=0.3, sig_n=0.152),
+          dict(site="AB37", lat=62.967322, lon=-145.451881, ve=-13.75, vn=10.503, sig_e=0.297, sig_n=0.21)]
+
+
+def _inside(px, py, tx, ty):
+    """All points strictly inside the triangle (same side of every edge)."""
+    sgn = []
+    for i in range(3):
+        ax_, ay_, bx, by = tx[i], ty[i], tx[(i + 1) % 3], ty[(i + 1) % 3]
+        sgn.append(np.sign((bx - ax_) * (py - ay_) - (by - ay_) * (px - ax_)))
+    s = np.array(sgn)
+    return bool(np.all(s == s[0, 0]))
+
+
+@pytest.mark.parametrize("stations", [TAHOE, ALASKA], ids=["tahoe", "alaska"])
+def test_strain_ellipse_fits_inside_triangle(stations):
+    import matplotlib.pyplot as plt
+
+    from gps_strain import compute_strain, plotting
+    from gps_strain.data import from_records
+
+    t = from_records(stations)
+    r = compute_strain(t, mc_samples=0)
+    fig = plotting.strain_map(r, t, None, basemap="none")
+    ax = fig.axes[0]
+    width = ax.get_xlim()[1] - ax.get_xlim()[0]
+    fit = plotting.ellipse_fit_width(r, t)
+    default = plotting.strain_map(r, t, None, basemap="none", fit_ellipse=False).axes[0]
+    assert width < default.get_xlim()[1] - default.get_xlim()[0]   # zoomed in ...
+    assert fit * (1 - 1e-9) <= width <= fit * 1.1                  # ... to the fit (or the station margin)
+    R = plotting.ELLIPSE_FRAC * min(width, fit)                    # 11% of the map when it can be
+    tx, ty = bm.lonlat_to_merc(t["lon"].to_numpy(float), t["lat"].to_numpy(float))
+    th = np.linspace(0, 2 * np.pi, 721)
+    circ = np.vstack([np.cos(th), np.sin(th)])
+    F = np.eye(2) + plotting.exaggeration_for(r) * r.strain_tensor
+    for pts in (circ, F @ circ):
+        assert _inside(tx.mean() + R * pts[0], ty.mean() + R * pts[1], tx, ty)
+    # every station keeps a margin inside the map
+    x0, x1 = ax.get_xlim()
+    y0, y1 = ax.get_ylim()
+    assert ((tx - x0) / (x1 - x0)).min() >= plotting.STATION_PAD - 1e-9
+    assert ((x1 - tx) / (x1 - x0)).min() >= plotting.STATION_PAD - 1e-9
+    plt.close("all")
+
+
+def test_skinny_triangle_shrinks_glyph_instead_of_hiding_stations():
+    import matplotlib.pyplot as plt
+
+    from gps_strain import compute_strain, plotting
+    from gps_strain.data import from_records
+
+    skinny = [dict(TAHOE[0]), dict(TAHOE[1]), dict(TAHOE[2])]
+    skinny[2].update(lat=39.47, lon=-120.30)   # nearly on the P146-P149 line
+    t = from_records(skinny)
+    r = compute_strain(t, mc_samples=0)
+    fit = plotting.ellipse_fit_width(r, t)
+    ax = plotting.strain_map(r, t, None, basemap="none").axes[0]
+    width = ax.get_xlim()[1] - ax.get_xlim()[0]
+    assert width > fit                       # stations' margin wins over the zoom
+    tx, _ = bm.lonlat_to_merc(t["lon"].to_numpy(float), t["lat"].to_numpy(float))
+    assert ((tx - ax.get_xlim()[0]) / width).min() >= plotting.STATION_PAD - 1e-9
+    plt.close("all")
+
+
+def test_wordmark_right_edge_on_map_axis():
+    import matplotlib.pyplot as plt
+
+    from gps_strain import compute_strain, plotting
+    from gps_strain.data import from_records
+
+    t = from_records(TAHOE)
+    r = compute_strain(t, mc_samples=0)
+    fig = plotting.strain_map(r, t, None, basemap="none")
+    fig.canvas.draw()
+    ax = fig.axes[0]
+    mark = next(x for a in fig.axes for x in a.texts if x.get_text() == plotting.WORDMARK)
+    right_px = mark.get_window_extent().x1
+    axis_px = ax.get_window_extent().x1
+    assert abs(right_px - axis_px) < 2.0
+    plt.close("all")
