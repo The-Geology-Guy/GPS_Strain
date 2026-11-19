@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gps-strain"
+dynamic = ["version"]
+description = "Horizontal infinitesimal strain rate from GPS/GNSS velocities (Cronin & Resor triangle strain method)"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Luke Pajer" }]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.0",
+    "matplotlib>=3.8",
+    "requests>=2.31",
+    "pillow>=10",
+]
+
+[project.optional-dependencies]
+excel = ["openpyxl"]
+test = ["pytest>=8"]
+
+[project.scripts]
+gps-strain = "gps_strain.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/The-Geology-Guy/GPS_Strain"
+
+[tool.setuptools.dynamic]
+version = { attr = "gps_strain.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

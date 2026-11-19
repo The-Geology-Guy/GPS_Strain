@@ -1,96 +1,99 @@
-# GPS and infinitesimal strain analysis (GPS Strain)
+# GPS_Strain
 
-Main Project Resources: [PAJER, Luke](mailto:luke.pajer@gmail.com); [CRONIN, Vincent](mailto:vince_cronin@baylor.edu)
+**Horizontal infinitesimal strain rate from GPS/GNSS station velocities**: a Python implementation of the triangle strain method of [Vincent Cronin](https://croninprojects.org/Vince/) (Baylor) and Phil Resor (Wesleyan), taught in the SERC/GETSI module [*GPS, Strain, and Earthquakes*](https://serc.carleton.edu/getsi/teaching_materials/gps_strain/index.html).
 
-_Last Updated: October 2020_
+> **Version 2 (in development).** The 2020 code no longer installed or ran, and it computed velocities incorrectly (see [docs/AUDIT_2020.md](docs/AUDIT_2020.md)). The core has been rebuilt and is validated against Cronin & Resor's published worked example. The original file is kept in `legacy/`.
 
-[![GETSI page](https://img.shields.io/badge/GETSI-page-F78C26.svg)](https://serc.carleton.edu/getsi/teaching_materials/gps_strain/unit4.html)
-[![License](https://img.shields.io/badge/LICENSE-mit-43B02A.svg)](/LICENSE)
-[![jupyterlab](https://img.shields.io/badge/jupyterlab-0.35.4-F37821.svg)](https://jupyterlab.readthedocs.io/en/stable/)
-[![python](https://img.shields.io/badge/python-3.6.5-yellow.svg)](https://jupyterlab.readthedocs.io/en/stable/)
+Give it three or more stations and it reports the following, then draws the two classic map sheets (a strain-symbol map and a strain-ellipse/velocity map):
 
------
+- the translation;
+- the rotation;
+- the strain-rate tensor;
+- the principal strain rates **e1H / e2H** and their azimuths **S1H / S2H**;
+- the maximum shear and area strain;
+- 1σ uncertainties for all of the above.
 
-# PROJECT OVERVIEW
+<p align="center"><img src="examples/AC63_symbol.png" width="800"/></p>
+<p align="center"><img src="examples/AC63_strain.png" width="600"/></p>
 
-The `GPS_Strain` Python package is a translation of the methods developed by Vince Cronin and Phil Resor. The purpose of this package is to make the method available to those who are interested in GPS and infinitesimal strain analysis and are more comfortable using Python.
+<sub>Example images were rendered offline with the synthetic preview basemap. With network access the default basemap is Esri World Terrain Base.</sub>
 
-_From [the GETSI teaching materials](https://serc.carleton.edu/getsi/teaching_materials/gps_strain/unit4.html):_
+## Install
 
-> This module was designed for structural geology courses but can also be successfully used in geophysics, tectonics, or geohazards courses or possibly even a physics or engineering course seeking practical applications. It can be done at almost any point during the term. The module assumes that students have had a basic physical geology introduction to plate tectonics, faults, and earthquakes.
+```bash
+pip install git+https://github.com/The-Geology-Guy/GPS_Strain@v2-rebuild
+```
 
-In addition to teaching purposes, the actual analysis can be used for other assessments. See the Victoria E. Worrell thesis titled ["The Seismo-Lineament Analysis Method (SLAM) Applied to the South Napa Earthquake and Antecedent Events"](https://baylor-ir.tdl.org/bitstream/handle/2104/9796/WORRELL-THESIS-2016.pdf?sequence=1&isAllowed=y) to see an example of how this method may be used in practice. 
+Requires Python ≥ 3.11 with numpy, pandas, matplotlib, requests and Pillow. No cartopy or GDAL is needed.
 
-If there are any issues or concerns with the python package, please reach out to [Luke Pajer](mailto:luke.pajer@gmail.com). For any questions regarding the GPS strain method, please reach out to [Vince Cronin](mailto:vince_cronin@baylor.edu).
+## Use
 
------
+Command line:
 
-# CONTRIBUTORS
+```bash
+# velocities from the Nevada Geodetic Laboratory (MIDAS, North America fixed)
+# writes tahoe_symbol.pdf and tahoe_strain.pdf
+gps-strain P146 P149 P150 -o tahoe
 
-This project is an open project, and contributions are welcome from any individual. All contributors to this project are bound by a [code of conduct](/CODE_OF_CONDUCT.md). Please review and follow this code of conduct as part of your contribution.
+# the original Stamen terrain-background look (needs a Stadia Maps key)
+gps-strain P146 P149 P150 -o tahoe --basemap stadia-terrain-background --api-key YOUR_KEY
 
-#### Contributions to the GPS_Strain Python Package
-- [Luke Pajer](mailto:luke.pajer@gmail.com) [![orcid](https://img.shields.io/badge/orcid-0000--0002--5218--7650-brightgreen.svg)](https://orcid.org/0000-0002-5218-7650)
+# add a logo (file or URL) to the sheets
+gps-strain P146 P149 P150 -o tahoe --logo earthscope_logo.png
 
-#### GPS and infinitesimal strain analysis method Authors/Developers
-- [Vince Cronin](mailto:vince_cronin@baylor.edu) [![orcid](https://img.shields.io/badge/orcid-0000--0002--3069--6470-brightgreen.svg)](https://orcid.org/0000-0002-3069-6470)
-- [Phil Resor](mailto:presor@wesleyan.edu) [![orcid](https://img.shields.io/badge/orcid-0000--0003--3071--5085-brightgreen.svg)](https://orcid.org/0000-0003-3071-5085)
+# which stations are near a point?
+gps-strain --near 38.22 -122.31 --radius 30
 
-### Tips for Contributing
+# your own velocities (mm/yr): columns site, lat, lon, ve, vn, sig_e, sig_n
+gps-strain --table examples/cronin_example.csv -o example
 
-Issues and bug reports are always welcome.  Code clean-up, and feature additions can be done either through pull requests to [project forks]() or branches.
+# reproduce the classic GETSI spreadsheet (UTM) instead of the local ENU frame
+gps-strain --table examples/cronin_example.csv --frame utm
+```
 
-All products of the SLAM project are licensed under an [MIT License](LICENSE) unless otherwise noted.
+Python:
 
------
+```python
+from gps_strain import data, compute_strain, plotting
 
-## HOW TO USE THIS REPOSITORY
+midas = data.load_midas("NA")            # cached for a week
+sta = data.select_sites(midas, ["P146", "P149", "P150"])
+r = compute_strain(sta)                  # frame="enu" (default) or "utm"
+print(r.report())
+r.e1, r.e2, r.azimuth_s1, r.max_shear, r.rotation, r.sigma, r.mc
+plotting.symbol_map(r, sta, "symbol.pdf", logo="earthscope_logo.png")
+plotting.strain_map(r, sta, "strain.pdf", basemap="stadia-terrain-background")
+```
 
-This repository is available to be 
+## Basemaps
 
-Base overview for SLAM map generation (_see the [GPS_Strain Wiki](https://github.com/The-Geology-Guy/GPS_Strain/wiki) for more information_):
-1. Find GPS Sites -- _either using the `get_stations` function or simply find 3 on the UNAVCO site_
-2. Get site coordinates and velocities using the `site_data` function
-3. Process the strain data using the `strain_data` class
-4. Use the processed strain data to produce one of the two types of maps: (1) Strain Ellipse Map or (2) Map Symbol Map
+| `--basemap` | Look | Key / cost |
+|---|---|---|
+| `esri-terrain` (default) | Hillshade, tan/green land, blue water: closest to Stamen terrain-background | A distributed app needs an ArcGIS Location Platform key (`ESRI_API_KEY`); 2M tiles/month free |
+| `stadia-terrain-background` | The exact Stamen style the 2020 maps used | Stadia key (`STADIA_API_KEY`). The free tier is non-commercial; paid plans start at $20/mo. Print rights are limited (see `docs/research/04_costs.md`). |
+| `esri-shaded-relief`, `esri-physical`, `esri-imagery`, `opentopomap` | Alternatives | Attribution printed automatically |
+| `synthetic` | Offline procedural preview | None |
 
-Once again, this is a simple overview of a typical GPS Strain task. This is in no way the limit of what can be done. See the [GPS_Strain Wiki](https://github.com/The-Geology-Guy/GPS_Strain/wiki) for more information.
+Tiles are cached in `~/.cache/gps_strain/tiles`.
 
-### System Requirements
+## Tests
 
-This project is developed using Python. There should be no issues with these projects running on Mac, Windows, or Linux. If there are any issues, please submit an issue and it will be investigated.
+```bash
+pip install -e .[test]
+pytest
+```
 
-### Data Resources used in GPS_Strain
+## Documentation
 
-#### A. Data Sources
+- [docs/METHOD.md](docs/METHOD.md): the math and geophysics, step by step, with references.
+- [docs/AUDIT_2020.md](docs/AUDIT_2020.md): what was wrong with the 2020 version.
+- [docs/ROADMAP.md](docs/ROADMAP.md): next steps, including the Mac/PC desktop app and gps-strain.org.
+- [docs/research/](docs/research/): full research notes with source URLs, including the cost analysis.
 
-- [UNAVCO Web Services](https://www.unavco.org/data/web-services/documentation/documentation.html#!/GNSS47GPS/getPositionByStationId) is used for the station locations and relative station velocity.  
+## Data and credits
 
-#### B. Physical Maps
+- **Method:** Cronin, V. S., & Resor, P. G. (2021), *Algorithm for triangle strain*; Cronin (2021), *Primer on infinitesimal strain analysis*.
+- **Default velocities:** Nevada Geodetic Laboratory MIDAS. Please cite Blewitt, Hammond & Kreemer (2018), *Eos* 99, doi:10.1029/2018EO104623, and Blewitt et al. (2016), *JGR* 121, doi:10.1002/2015JB012552.
+- **Python package:** Luke Pajer ([ORCID 0000-0002-5218-7650](https://orcid.org/0000-0002-5218-7650)).
 
-- [Stamen Map Tile Sets](http://maps.stamen.com/#watercolor/12/37.7706/-122.3782) are used to generate the physical maps in this package. The Stamen map tile sets are copyright Stamen Design, under a Creative Commons Attribution (CC BY 3.0) license.
-
-### Key Outputs
-
-GPS_Strain provides the user a map with seismo-lineament bounds defined. Below are two examples:
-
-#### Example of a Strain Ellipse Map with Legend and Data
-<p align="center"><img src="images/Finished_Maps/AC63_strain.jpg" width=800/></p>
-
-#### Example of a Map Symbol plotted with Legend and Strain Ellipse
-![image](images/Finished_Maps/AC63_symbol.jpg)
-
------
-
-## <a name="section9">REFERENCES</a>
-
-**_Note: The reference section is still not complete. This is in progress. Only links to resources appear at the moment._**
-
-- https://serc.carleton.edu/getsi/teaching_materials/gps_strain/overview.html
-- https://croninprojects.org/Vince/Course/IntroStructGeol/index.htm
-- https://www.unavco.org/data/web-services/documentation/documentation.html#!/GNSS47GPS/getPositionByStationId
-- https://gited.io/notebook/57/MTFfU3RyYWluX2VsbGlwc2UuaXB5bmI=/aHR0cHM6Ly9naXRodWIuY29tL29uZHJvbGV4YS9zZzIvYmxvYi9tYXN0ZXIvMTFfU3RyYWluX2VsbGlwc2UuaXB5bmI=
-- https://www.continuummechanics.org/deformationgradient.html
-- https://gist.github.com/jakebathman/719e8416191ba14bb6e700fc2d5fccc5
-- http://maps.stamen.com/ 
-    - The Stamen map tile sets are copyright Stamen Design, under a Creative Commons Attribution (CC BY 3.0) license.
+MIT License. Issues and contributions are welcome; see the [code of conduct](CODE_OF_CONDUCT.md).
