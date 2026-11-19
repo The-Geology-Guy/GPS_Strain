@@ -1,0 +1,56 @@
+name: web app
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "src/**", "scripts/**", "pyproject.toml", ".github/workflows/pages.yml"]
+  schedule:
+    - cron: "43 10 * * 2"   # Tuesdays: refresh the station list (NGL updates MIDAS weekly)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the site
+        run: |
+          pip install build
+          BUILD=${GITHUB_SHA::10}
+          mkdir -p _site && cp -r web/. _site/
+          # the Python package, as a wheel the browser installs with micropip
+          python -m build --wheel --outdir _site/py/$BUILD
+          WHEEL=$(ls _site/py/$BUILD/*.whl | xargs -n1 basename)
+          echo "{\"wheel\": \"$BUILD/$WHEEL\", \"commit\": \"$GITHUB_SHA\"}" > _site/py/manifest.json
+          # this week's US station velocities (NGL MIDAS, North America fixed)
+          pip install _site/py/$BUILD/$WHEEL
+          python scripts/build_web_data.py _site/data NA
+          # cache-bust static assets so a deploy is picked up immediately
+          sed -i "s/__BUILD__/$BUILD/g" _site/index.html _site/assets/app.js
+          cat _site/py/manifest.json
+          du -sh _site/*
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

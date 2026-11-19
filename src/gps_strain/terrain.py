@@ -97,15 +97,30 @@ def _cache_dir() -> Path:
     return d
 
 
+HTTP_FETCH: Callable | None = None
+"""Optional replacement transport: ``f(url, params, timeout) -> (status, bytes)``.
+The web app sets this to a browser request when the package runs in Pyodide."""
+
+
 def _get(url, params=None, timeout=120, cache=True):
     """HTTP GET returning bytes, cached on disk. Returns None for 403/404
     (Copernicus has no tiles over open ocean; S3 answers 403 or 404)."""
-    import requests
-
     key = hashlib.sha1((url + repr(sorted((params or {}).items()))).encode()).hexdigest()
     f = _cache_dir() / "http" / key
     if cache and f.exists():
         return f.read_bytes()
+    if HTTP_FETCH is not None:
+        status, content = HTTP_FETCH(url, params, timeout)
+        if status in (403, 404):
+            return None
+        if not 200 <= status < 300:
+            raise RuntimeError(f"HTTP {status} from {url}")
+        if cache:
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_bytes(content)
+        return content
+    import requests
+
     last = None
     for attempt in range(3):
         try:
@@ -279,8 +294,15 @@ def fetch_copernicus(extent_merc, width, height, res=None, tile_getter: Callable
         data = getter(copernicus_tile_name(t[0], t[1], res), res)
         return t, (read_geotiff(data) if data else None)
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        for (la, lo), r in pool.map(load, tiles):
+    import sys
+
+    if sys.platform == "emscripten":  # Pyodide has no threads
+        loaded = [load(t) for t in tiles]
+    else:
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            loaded = list(pool.map(load, tiles))
+    if True:
+        for (la, lo), r in loaded:
             if r is None:
                 continue  # open ocean: no tile
             inside = (LAT >= la) & (LAT < la + 1) & (LON >= lo) & (LON < lo + 1)
@@ -462,7 +484,11 @@ def hillshade_rgb(z, extent_merc, style: HillshadeStyle = DEFAULT_STYLE) -> np.n
 # the one call plotting needs
 # ---------------------------------------------------------------------------
 
-def terrain_image(extent_merc, source="auto", target_px=2400, style: HillshadeStyle = DEFAULT_STYLE):
+TARGET_PX = 2400
+"""Default terrain image width in pixels (the web app lowers it on phones)."""
+
+
+def terrain_image(extent_merc, source="auto", target_px=None, style: HillshadeStyle = DEFAULT_STYLE):
     """Grey hillshade covering ``extent_merc`` = (x0, x1, y0, y1) in Web Mercator.
 
     Returns ``(rgb, credit)``; draw with ``imshow(rgb, extent=extent_merc,
@@ -470,7 +496,7 @@ def terrain_image(extent_merc, source="auto", target_px=2400, style: HillshadeSt
     or a callable (see the module docstring).
     """
     x0, x1, y0, y1 = extent_merc
-    width = int(target_px)
+    width = int(target_px or TARGET_PX)
     height = max(2, int(round(width * (y1 - y0) / (x1 - x0))))
     if height > 8000:
         height, width = 8000, max(2, int(round(8000 * (x1 - x0) / (y1 - y0))))

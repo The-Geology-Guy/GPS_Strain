@@ -51,7 +51,8 @@ Built to match **geoslam.org**: the same Windows-98 toolkit, desktop and mobile 
 
 **Scope (decided 18 Nov 2026): United States only for now** (CONUS, Alaska, Hawaii, Puerto Rico and territories, matching USGS 3DEP and Quaternary-fault coverage). Stations outside it are not offered; terrain comes from USGS 3DEP and faults from the USGS database only, so Copernicus and GEM are not used on the site. The Python package stays global. The solver is small enough to port to JavaScript or to run with Pyodide.
 
-- **Data:** mirror `midas.NA.txt` to JSON on the same domain with a scheduled job, since NGL may not allow direct browser requests.
+- **Built (18 Nov 2026):** `web/` (the GEOSLAM Windows 98 shell, copied), `src/gps_strain/web.py` (JSON bridge for Pyodide), `.github/workflows/pages.yml`.
+- **Data:** a compact US station list (`data/midas_us.NA.json`) built from NGL MIDAS at every deploy and every Tuesday, so the page never depends on NGL allowing browser requests.
 - **Basemap:** the same as geoslam.org: USGS The National Map tiles (topo default, shaded relief, imagery) plus OpenStreetMap, in MapLibre.
 - **Printing:** like geoslam.org, run this package in the browser (Pyodide, matplotlib loaded on first use) and draw the two sheets there, with the grey hillshade from 3DEP fetched by the browser.
 

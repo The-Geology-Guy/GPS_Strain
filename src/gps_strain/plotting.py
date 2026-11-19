@@ -195,6 +195,39 @@ def draw_ellipse(ax, result: StrainResult, center=(0.0, 0.0), radius=1.0, exagge
 # strain-rate map symbol
 # ---------------------------------------------------------------------------
 
+def strain_symbol_polygons(result: StrainResult, center, size, min_strain=0.1, max_strain=300.0):
+    """Outlines of the strain-rate map symbol as ``[(kind, (N, 2) array), ...]``
+    in data units, drawing order first. ``kind`` is ``"elongation"`` (white
+    double arrow through the centre) or ``"contraction"`` (black arrow
+    pointing at the centre). ``size`` is the half-length of a
+    ``max_strain`` symbol. Shared by the printed maps and the web map.
+    """
+    cx, cy = center
+    max_strain = max(max_strain, abs(result.e1) * NANO, abs(result.e2) * NANO)
+    items = sorted(((result.azimuth_s1, result.e1), (result.azimuth_s2, result.e2)),
+                   key=lambda t: t[1] < 0)  # elongation first (drawn underneath)
+    out = []
+    for az, e in items:
+        if abs(e) * NANO < min_strain:
+            continue
+        frac = _symbol_fraction(e, min_strain, max_strain)
+        half = size * frac
+        ang = math.radians(90.0 - az)  # azimuth -> math angle
+        if e > 0:
+            w = size * 0.16
+            poly = _arrow_polygon(2 * half, w, w * 1.9, w * 1.05, double=True) - [half, 0]
+            out.append(("elongation", _place(poly, ang, center)))
+        else:
+            w = size * 0.14
+            gap = size * 0.06
+            for sgn in (1, -1):
+                poly = _arrow_polygon(half, w, w * 2.4, w * 1.9)
+                start = np.array([cx, cy]) + sgn * _axis_vec(az) * (gap + half)
+                a = ang + (math.pi if sgn > 0 else 0.0)
+                out.append(("contraction", _place(poly, a, start)))
+    return out
+
+
 def draw_strain_symbol(ax, result: StrainResult, center, size, min_strain=0.1, max_strain=300.0,
                        zorder=40):
     """Map symbol at ``center``: inward black arrows for contraction, a white
@@ -202,30 +235,11 @@ def draw_strain_symbol(ax, result: StrainResult, center, size, min_strain=0.1, m
 
     ``size`` is the half-length (data units) of a 300-nanostrain symbol.
     """
-    cx, cy = center
-    max_strain = max(max_strain, abs(result.e1) * NANO, abs(result.e2) * NANO)
-    items = sorted(((result.azimuth_s1, result.e1), (result.azimuth_s2, result.e2)),
-                   key=lambda t: t[1] < 0)  # elongation first (drawn underneath)
-    for az, e in items:
-        if abs(e) * NANO < min_strain:
-            continue
-        frac = _symbol_fraction(e, min_strain, max_strain)
-        half = size * frac
-        ang = math.radians(90.0 - az)  # azimuth -> math angle
-        if e > 0:  # elongation: white double arrow through the centre
-            w = size * 0.16
-            poly = _arrow_polygon(2 * half, w, w * 1.9, w * 1.05, double=True) - [half, 0]
-            ax.add_patch(Polygon(_place(poly, ang, center), closed=True, fc="w", ec="k", lw=3,
-                                 joinstyle="miter", zorder=zorder))
-        else:      # contraction: two black arrows pointing at the centre
-            w = size * 0.14
-            gap = size * 0.06
-            for sgn in (1, -1):
-                poly = _arrow_polygon(half, w, w * 2.4, w * 1.9)
-                start = np.array([cx, cy]) + sgn * _axis_vec(az) * (gap + half)
-                a = ang + (math.pi if sgn > 0 else 0.0)
-                ax.add_patch(Polygon(_place(poly, a, start), closed=True, fc="k", ec="k", lw=1,
-                                     zorder=zorder + 1))
+    for kind, poly in strain_symbol_polygons(result, center, size, min_strain, max_strain):
+        if kind == "elongation":
+            ax.add_patch(Polygon(poly, closed=True, fc="w", ec="k", lw=3, joinstyle="miter", zorder=zorder))
+        else:
+            ax.add_patch(Polygon(poly, closed=True, fc="k", ec="k", lw=1, zorder=zorder + 1))
 
 
 # ---------------------------------------------------------------------------
@@ -625,7 +639,7 @@ def _load_logo(logo):
 
 
 WORDMARK = "GPS STRAIN"
-BLOCK = ["Arial Black", "Helvetica Neue", "Arial", "Liberation Sans", "DejaVu Sans"]
+BLOCK = ["Arial Black", "Archivo Black", "Helvetica Neue", "Arial", "Liberation Sans", "DejaVu Sans"]
 
 
 def draw_logo(ax, logo=None, align="center"):

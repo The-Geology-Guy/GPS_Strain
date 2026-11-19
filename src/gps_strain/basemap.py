@@ -20,6 +20,7 @@ from __future__ import annotations
 import io
 import math
 import os
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -119,12 +120,20 @@ def _fetch_tile(provider: TileProvider, z, x, y):
     cache = _cache_root() / provider.name / str(z) / str(x) / f"{y}.png"
     if cache.exists():
         return Image.open(cache).convert("RGB")
-    import requests
+    from . import terrain  # the same transport (the browser's, in the web app)
 
     url = provider.url.format(z=z, x=x, y=y)
-    r = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=30)
-    r.raise_for_status()
-    img = Image.open(io.BytesIO(r.content)).convert("RGB")
+    if terrain.HTTP_FETCH is not None:
+        status, content = terrain.HTTP_FETCH(url, None, 30)
+        if status != 200:
+            raise RuntimeError(f"HTTP {status} from {url}")
+    else:
+        import requests
+
+        r = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=30)
+        r.raise_for_status()
+        content = r.content
+    img = Image.open(io.BytesIO(content)).convert("RGB")
     cache.parent.mkdir(parents=True, exist_ok=True)
     img.save(cache)
     return img
@@ -151,8 +160,11 @@ def fetch_basemap(extent_merc, provider=DEFAULT_PROVIDER, zoom=None,
     ty0, ty1 = max(ty0, 0), min(ty1, n - 1)
     jobs = [(tx, ty) for ty in range(ty0, ty1 + 1) for tx in range(tx0, tx1 + 1)]
     getter = tile_source or (lambda zz, xx, yy: _fetch_tile(prov, zz, xx % n, yy))
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        tiles = list(pool.map(lambda j: getter(z, j[0], j[1]), jobs))
+    if sys.platform == "emscripten":  # Pyodide (the web app) has no threads
+        tiles = [getter(z, jx, jy) for jx, jy in jobs]
+    else:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            tiles = list(pool.map(lambda j: getter(z, j[0], j[1]), jobs))
     ts = tiles[0].size[0]
     mosaic = Image.new("RGB", ((tx1 - tx0 + 1) * ts, (ty1 - ty0 + 1) * ts))
     for (tx, ty), im in zip(jobs, tiles):

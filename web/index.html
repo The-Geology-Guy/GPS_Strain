@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Review build: keep search engines out until Vince Cronin signs off. Remove before public launch. -->
+  <meta name="robots" content="noindex, nofollow">
+  <title>GPS Strain</title>
+  <meta name="description" content="GPS triangle strain (Cronin &amp; Resor): strain rate from three GNSS station velocities, with printable maps.">
+  <meta name="theme-color" content="#008080">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+  <link href="assets/app.css?v=__BUILD__" rel="stylesheet">
+</head>
+<body>
+<div class="desktop" id="desktop">
+
+  <!-- ============================================================ main window -->
+  <section class="window win-app is-active" id="win-app" aria-labelledby="t-app">
+    <header class="titlebar">
+      <img class="ti" src="assets/icon.svg" alt="">
+      <h1 class="title" id="t-app">GPS Strain - Triangle Strain Analysis</h1>
+      <div class="tb-btns">
+        <button type="button" class="tb tb-min" data-win="min" aria-label="Minimize"></button>
+        <button type="button" class="tb tb-max" data-win="max" aria-label="Maximize"></button>
+        <button type="button" class="tb tb-close" data-win="min" aria-label="Close (reopen from the taskbar)"></button>
+      </div>
+    </header>
+
+    <nav class="menubar" aria-label="Menu">
+      <div class="menu">
+        <button type="button" class="menu-btn" aria-haspopup="menu" aria-expanded="false"><u>F</u>ile</button>
+        <div class="menu-pop" role="menu" hidden>
+          <button type="button" role="menuitem" data-click="#rep-open" data-needs="results">Report view…</button>
+          <hr>
+          <button type="button" role="menuitem" data-click="#dl-csv" data-needs="results">Save results (.csv)</button>
+          <button type="button" role="menuitem" data-click="#dl-txt" data-needs="results">Save summary (.txt)</button>
+          <button type="button" role="menuitem" data-click="#dl-geojson" data-needs="results">Save map layers as GeoJSON</button>
+          <button type="button" role="menuitem" data-click="#dl-png" data-needs="results">Save screenshot</button>
+          <hr>
+          <button type="button" role="menuitem" data-click="#share" data-needs="results">Copy share link</button>
+          <hr>
+          <button type="button" role="menuitem" data-action="restart">Start over</button>
+        </div>
+      </div>
+      <div class="menu">
+        <button type="button" class="menu-btn" aria-haspopup="menu" aria-expanded="false"><u>V</u>iew</button>
+        <div class="menu-pop" role="menu" hidden>
+          <button type="button" role="menuitemradio" data-basemap="topo">USGS topographic</button>
+          <button type="button" role="menuitemradio" data-basemap="relief">USGS shaded relief</button>
+          <button type="button" role="menuitemradio" data-basemap="imagery">USGS imagery</button>
+          <button type="button" role="menuitemradio" data-basemap="osm">OpenStreetMap</button>
+          <hr>
+          <button type="button" role="menuitemcheckbox" data-toggle="#show-faults">Quaternary faults</button>
+          <button type="button" role="menuitemcheckbox" data-toggle="#show-all">All GNSS stations</button>
+        </div>
+      </div>
+      <div class="menu">
+        <button type="button" class="menu-btn" aria-haspopup="menu" aria-expanded="false"><u>H</u>elp</button>
+        <div class="menu-pop" role="menu" hidden>
+          <button type="button" role="menuitem" data-open="methods">How triangle strain works</button>
+          <button type="button" role="menuitem" data-open="about">About GPS Strain</button>
+          <hr>
+          <a role="menuitem" href="https://github.com/The-Geology-Guy/GPS_Strain/blob/main/docs/METHOD.md" target="_blank" rel="noopener">Technical reference</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="win-body" id="panel">
+      <p class="tagline">How is the ground deforming between three GPS stations? Compute the strain rate from their velocities and print the maps.</p>
+
+      <form id="flow" autocomplete="off" novalidate>
+        <!-- Step 1 -->
+        <section class="step" id="step-sta" data-step="1">
+          <h2><span class="step-n">1.</span> Stations</h2>
+          <div class="tabs" role="tablist">
+            <button type="button" role="tab" class="tab is-on" data-tab="ids" aria-selected="true">Station IDs</button>
+            <button type="button" role="tab" class="tab" data-tab="pick" aria-selected="false">Pick on map</button>
+            <button type="button" role="tab" class="tab" data-tab="manual" aria-selected="false">Enter values</button>
+          </div>
+          <div class="tab-sheet">
+            <div class="tabpane" data-pane="ids">
+              <div class="ids-row">
+                <label class="field"><span>Station 1:</span><input id="id1" placeholder="P146" spellcheck="false" maxlength="4"></label>
+                <label class="field"><span>Station 2:</span><input id="id2" placeholder="P149" spellcheck="false" maxlength="4"></label>
+                <label class="field"><span>Station 3:</span><input id="id3" placeholder="P150" spellcheck="false" maxlength="4"></label>
+                <div class="field"><span>&nbsp;</span><button type="button" id="use-ids" class="btn">Load</button></div>
+              </div>
+              <p class="hint">Try <button type="button" class="linkish example" data-ids="P146,P149,P150">Lake Tahoe (Cronin &amp; Resor)</button>, <button type="button" class="linkish example" data-ids="AC63,AC62,AB37">Alaska Range</button> or <button type="button" class="linkish example" data-ids="P198,P200,SVIN">South Napa (GETSI Unit 5)</button>.</p>
+            </div>
+
+            <div class="tabpane" data-pane="pick" hidden>
+              <p class="hint">Zoom in until the GNSS stations appear as small white dots, then tap three of them. Choose stations whose triangle has no angle under about 30° and no side over 100 km.</p>
+              <div class="inline"><button type="button" id="pick-clear" class="btn">Clear</button></div>
+            </div>
+
+            <div class="tabpane" data-pane="manual" hidden>
+              <p class="hint">Your own velocities, e.g. from EarthScope station pages. Velocities and 1σ uncertainties in mm/yr; latitude and longitude in degrees.</p>
+              <div class="manual-grid" id="manual-grid">
+                <span>Site</span><span>Latitude</span><span>Longitude</span><span>V east</span><span>V north</span><span>σ east</span><span>σ north</span>
+              </div>
+              <p class="hint">Or load a CSV with columns site, lat, lon, ve, vn, sig_e, sig_n: <input type="file" id="csv-file" accept=".csv,.txt"></p>
+              <button type="button" id="use-manual" class="btn">Use these values</button>
+            </div>
+          </div>
+          <ol id="sta-list" class="sta-list"></ol>
+          <p id="data-note" class="data-note"></p>
+        </section>
+
+        <!-- Step 2 -->
+        <section class="step" id="step-frame" data-step="2">
+          <h2><span class="step-n">2.</span> Velocities</h2>
+          <p class="unc-text" id="frame-text">Velocities relative to stable North America (NGL MIDAS, IGS20), with their 1σ uncertainties.</p>
+          <fieldset class="sub">
+            <legend>Compute the strain in</legend>
+            <label><input type="radio" name="frame" value="enu" checked><span>Local east/north at the triangle (recommended)</span></label>
+            <label><input type="radio" name="frame" value="utm"><span>UTM, as in the classic GETSI spreadsheet</span></label>
+          </fieldset>
+        </section>
+
+        <!-- Step 3 -->
+        <section class="step" id="step-glyph" data-step="3">
+          <h2><span class="step-n">3.</span> Map symbol</h2>
+          <div class="choice">
+            <label><input type="radio" name="glyph" value="ellipse" checked><span>Strain ellipse with its S1H and S2H axes</span></label>
+            <label><input type="radio" name="glyph" value="symbol"><span>Strain-rate symbol: black arrows for shortening, white for lengthening</span></label>
+          </div>
+        </section>
+
+        <div class="run-row">
+          <button type="submit" id="run" class="btn primary" disabled>Compute the strain</button>
+        </div>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </form>
+
+      <section id="results" class="results" hidden>
+        <h2>Results</h2>
+        <div id="tri-results"></div>
+        <div class="report-box">
+          <h3>More triangles</h3>
+          <p class="hint">Keep this triangle and choose three more stations; every triangle is drawn on the map and on the network sheets.</p>
+          <ol id="tri-list" class="rep-list"></ol>
+          <div class="exports"><button type="button" class="btn" id="tri-add">Add another triangle</button></div>
+        </div>
+        <div class="report-box">
+          <h3>Map sheets</h3>
+          <p class="hint">Print-ready sheets in the style of the original GPS_Strain maps: terrain, Quaternary faults, the station triangle, velocities and the strain ellipse or symbol, with legends and tables.</p>
+          <div class="exports"><button type="button" class="btn strong" id="rep-open">Report view &amp; download…</button></div>
+        </div>
+        <div class="exports">
+          <button type="button" class="btn" id="share">Copy share link</button>
+          <button type="button" class="btn" id="dl-csv">Results CSV</button>
+          <button type="button" class="btn" id="dl-geojson">GeoJSON</button>
+          <button type="button" class="btn" id="dl-png">Screenshot</button>
+          <button type="button" class="btn" id="dl-txt">Summary</button>
+        </div>
+      </section>
+
+      <footer class="credits">
+        The triangle strain method is the work of <a href="https://croninprojects.org/Vince/" target="_blank" rel="noopener">Vince Cronin</a> (Baylor University) and Phil Resor (Wesleyan University). GPS Strain by Luke Pajer. Data: Nevada Geodetic Laboratory MIDAS velocities (Blewitt et al., 2016, 2018); USGS 3DEP; USGS Quaternary Fault and Fold Database. United States only for now. <a href="https://github.com/The-Geology-Guy/GPS_Strain" target="_blank" rel="noopener">Source code</a>.
+      </footer>
+    </div>
+    <div class="statusbar"><p class="sb-pane" id="sb-app">Ready</p></div>
+  </section>
+
+  <!-- ============================================================= map window -->
+  <section class="window win-map" id="win-map" aria-labelledby="t-map">
+    <header class="titlebar">
+      <img class="ti" src="assets/icon.svg" alt="">
+      <h2 class="title" id="t-map">Map - USGS topographic</h2>
+      <div class="tb-btns">
+        <button type="button" class="tb tb-min" data-win="min" aria-label="Minimize"></button>
+        <button type="button" class="tb tb-max" data-win="max" aria-label="Maximize"></button>
+        <button type="button" class="tb tb-close" data-win="min" aria-label="Close (reopen from the taskbar)"></button>
+      </div>
+    </header>
+    <div class="toolbar">
+      <label class="basemap">Base map:
+        <select id="basemap">
+          <option value="topo">USGS topographic</option>
+          <option value="relief">USGS shaded relief</option>
+          <option value="imagery">USGS imagery</option>
+          <option value="osm">OpenStreetMap</option>
+        </select>
+      </label>
+    </div>
+    <main class="map-wrap">
+      <div id="map" aria-label="Map"></div>
+      <div class="map-tools">
+        <div class="legend" id="legend">
+          <button type="button" class="legend-title" aria-expanded="true" aria-controls="legend-body">Legend<i class="legend-tg" aria-hidden="true"></i></button>
+          <div class="legend-body" id="legend-body">
+            <div><i class="dot sta"></i>GNSS station</div>
+            <div><i class="ln tri"></i>Station triangle</div>
+            <div><i class="ln vel"></i>Velocity</div>
+            <div><i class="ln s1"></i>S1H (max. lengthening)</div>
+            <div><i class="ln s2"></i>S2H (max. shortening)</div>
+            <div><i class="ln ell"></i>Strain ellipse</div>
+            <div><i class="ln fault"></i>Fault (USGS)</div>
+            <label class="check"><input type="checkbox" id="show-faults" checked> Quaternary faults</label>
+            <label class="check"><input type="checkbox" id="show-all" checked> All GNSS stations</label>
+          </div>
+        </div>
+      </div>
+      <div id="busy" class="busy" role="alertdialog" aria-labelledby="busy-title" hidden>
+        <div class="titlebar"><span class="title" id="busy-title">Please wait</span></div>
+        <div class="busy-body">
+          <span id="busy-text"></span>
+          <div class="bar"><i></i></div>
+        </div>
+      </div>
+    </main>
+    <div class="statusbar"><p class="sb-pane" id="sb-coords">Move the pointer over the map</p><p class="sb-pane sb-narrow" id="sb-zoom"></p></div>
+  </section>
+</div>
+
+<!-- ================================================================== taskbar -->
+<footer class="taskbar">
+  <button type="button" class="start" id="start" aria-haspopup="menu" aria-expanded="false" aria-controls="start-menu"><img src="assets/icon.svg" alt="">Start</button>
+  <div class="tasks">
+    <button type="button" class="task is-on" data-task="win-app"><img src="assets/icon.svg" alt="">GPS Strain</button>
+    <button type="button" class="task is-on" data-task="win-map"><img src="assets/icon.svg" alt="">Map</button>
+  </div>
+  <div class="tray"><time id="clock"></time></div>
+</footer>
+
+<nav class="start-menu" id="start-menu" role="menu" aria-label="Start" hidden>
+  <div class="banner" aria-hidden="true"><span><b>GPS STRAIN</b>98</span></div>
+  <div class="start-items">
+    <button type="button" role="menuitem" data-open="methods">How triangle strain works</button>
+    <button type="button" role="menuitem" data-open="about">About GPS Strain</button>
+    <button type="button" role="menuitem" data-click="#rep-open" data-needs="results">Report view…</button>
+    <button type="button" role="menuitem" data-click="#share" data-needs="results">Copy share link</button>
+    <hr>
+    <a role="menuitem" href="https://geoslam.org" target="_blank" rel="noopener">GEOSLAM (seismo-lineaments)</a>
+    <a role="menuitem" href="https://serc.carleton.edu/getsi/teaching_materials/gps_strain/index.html" target="_blank" rel="noopener">GETSI: GPS, Strain, and Earthquakes</a>
+    <a role="menuitem" href="https://github.com/The-Geology-Guy/GPS_Strain" target="_blank" rel="noopener">Source code</a>
+    <hr>
+    <button type="button" role="menuitem" data-action="restart">Start over…</button>
+  </div>
+</nav>
+
+<!-- ================================================================== dialogs -->
+<dialog id="dlg-methods" class="dlg window">
+  <header class="titlebar">
+    <img class="ti" src="assets/icon.svg" alt="">
+    <h2 class="title">How triangle strain works</h2>
+    <form method="dialog" class="tb-btns"><button class="tb tb-close" aria-label="Close"></button></form>
+  </header>
+  <div class="dlg-body doc">
+    <p>GPS (GNSS) stations move a few millimetres per year. If three stations move differently, the ground between them is being stretched, shortened, sheared or rotated. Assuming that deformation is uniform inside the triangle, the three velocities are enough to work out how.</p>
+    <h3>The model</h3>
+    <p>With <em>x</em> east and <em>y</em> north (metres from the triangle's centre), each station's velocity is a translation plus a rotation plus a strain rate:</p>
+    <p class="eq">v<sub>E</sub> = t<sub>x</sub> − y ω + x ε<sub>xx</sub> + y ε<sub>xy</sub></p>
+    <p class="eq">v<sub>N</sub> = t<sub>y</sub> + x ω + x ε<sub>xy</sub> + y ε<sub>yy</sub></p>
+    <p>Three stations give six equations for the six unknowns. The velocity uncertainties weight the solution and are carried through to every result (the ± values, from 20,000 Monte Carlo draws).</p>
+    <h3>Reading the result</h3>
+    <p><strong>e1H</strong> is the greatest horizontal lengthening rate and <strong>e2H</strong> the least (negative = shortening), along azimuths <strong>S1H</strong> and <strong>S2H</strong>. They are in nanostrain per year: 1 nanostrain/yr is 1 mm of change per 1,000 km each year. Maximum shear is e1H − e2H; area strain is e1H + e2H. Rotation is positive counter-clockwise.</p>
+    <p>On the map the <strong>strain ellipse</strong> shows the shape a circle would take (hugely exaggerated); the <strong>strain-rate symbol</strong> uses black arrows pointing in for shortening and a white double arrow for lengthening.</p>
+    <h3>Choosing stations</h3>
+    <p>Use three neighbouring stations with long records, no interior angle under about 30° and no side over about 100 km (GETSI Unit 6). Skinny or large triangles average over too much.</p>
+    <p class="muted">Full derivation: <a href="https://github.com/The-Geology-Guy/GPS_Strain/blob/main/docs/METHOD.md" target="_blank" rel="noopener">docs/METHOD.md</a>. Cronin, V.S., and Resor, P.G., 2021, <em>Algorithm for triangle strain</em>; Cronin, V.S., 2021, <em>Primer on infinitesimal strain analysis</em>.</p>
+  </div>
+  <form method="dialog" class="dlg-foot"><button class="btn primary-ok">OK</button></form>
+</dialog>
+
+<dialog id="dlg-report" class="dlg window wide">
+  <header class="titlebar">
+    <img class="ti" src="assets/icon.svg" alt="">
+    <h2 class="title">Report view</h2>
+    <form method="dialog" class="tb-btns"><button class="tb tb-close" aria-label="Close"></button></form>
+  </header>
+  <div class="dlg-body">
+    <div class="rep-layout">
+      <div class="rep-preview">
+        <div id="rep-img-wrap"><img id="rep-img" alt="Map sheet preview"><p id="rep-msg" class="hint"></p></div>
+      </div>
+      <form id="rep-form" class="rep-opts" onsubmit="return false">
+        <label class="field"><span>Sheet:</span>
+          <select id="r-sheet">
+            <option value="strain">Strain ellipse and velocities (portrait)</option>
+            <option value="symbol">Strain-rate symbol (landscape)</option>
+            <option value="network_ellipse">All triangles: strain ellipses</option>
+            <option value="network_symbol">All triangles: strain symbols</option>
+          </select></label>
+        <label class="field" id="r-tri-row" hidden><span>Triangle:</span><select id="r-tri"></select></label>
+        <label class="field"><span>Title:</span><input type="text" id="r-title" placeholder="optional"></label>
+        <label class="field"><span>Map background:</span>
+          <select id="r-basemap">
+            <option value="hillshade">Grey hillshade</option>
+            <option value="hillshade-color">Hillshade with elevation colours</option>
+            <option value="elevation">Elevation colours</option>
+            <option value="slope">Slope</option>
+            <option value="usgs-topo">USGS topographic</option>
+            <option value="usgs-relief">USGS shaded relief</option>
+            <option value="usgs-imagery">USGS imagery</option>
+            <option value="none">None</option>
+          </select></label>
+        <div class="grid2">
+          <label class="field"><span>Light from:</span>
+            <select id="r-light">
+              <option value="315">Northwest (315°)</option>
+              <option value="270">West (270°)</option>
+              <option value="0">North (0°)</option>
+              <option value="custom">Custom azimuth</option>
+            </select></label>
+          <label class="field"><span>Azimuth (°):</span><input type="number" id="r-az" min="0" max="360" value="315" disabled></label>
+          <label class="field range"><span>Sun altitude: <output id="r-alt-o">30°</output></span><input type="range" id="r-alt" min="5" max="60" value="30"></label>
+          <label class="field range"><span>Vertical exaggeration: <output id="r-ex-o">2×</output></span><input type="range" id="r-ex" min="1" max="5" step="0.5" value="2"></label>
+        </div>
+        <fieldset class="sub checks">
+          <legend>Show</legend>
+          <label><input type="checkbox" id="r-faults" checked> Quaternary faults</label>
+          <label><input type="checkbox" id="r-vis"> Increase visibility</label>
+          <label><input type="checkbox" id="r-grey"> Greyscale (USGS maps)</label>
+        </fieldset>
+        <div class="grid2">
+          <label class="field"><span>Terrain detail:</span>
+            <select id="r-detail"><option value="1600" selected>Standard</option><option value="2400">High (slower)</option></select></label>
+          <label class="field"><span>File:</span>
+            <select id="r-fmt">
+              <option value="png:150">PNG, 150 dpi</option>
+              <option value="png:300">PNG, 300 dpi</option>
+              <option value="pdf">PDF</option>
+              <option value="svg">SVG</option>
+            </select></label>
+        </div>
+        <div class="exports">
+          <button type="button" class="btn strong" id="r-dl">Download sheet</button>
+        </div>
+        <p class="hint">Terrain: USGS 3DEP. Faults: USGS Quaternary Fault and Fold Database. Velocities: NGL MIDAS. The sources are printed on every sheet.</p>
+      </form>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlg-about" class="dlg window">
+  <header class="titlebar">
+    <img class="ti" src="assets/icon.svg" alt="">
+    <h2 class="title">About GPS Strain</h2>
+    <form method="dialog" class="tb-btns"><button class="tb tb-close" aria-label="Close"></button></form>
+  </header>
+  <div class="dlg-body about">
+    <div class="about-head">
+      <img src="assets/icon.svg" alt="" width="48" height="48">
+      <div>
+        <p class="about-name">GPS Strain</p>
+        <p>Triangle strain from GNSS velocities</p>
+      </div>
+    </div>
+    <hr>
+    <p>The GPS triangle strain method is the work of Vince Cronin (Baylor University) and Phil Resor (Wesleyan University), taught in the SERC/GETSI module <em>GPS, Strain, and Earthquakes</em>. GPS Strain is an open-source Python implementation by Luke Pajer that reproduces Cronin and Resor's published worked example exactly.</p>
+    <p>Everything runs in your browser. Station velocities are a weekly copy of the Nevada Geodetic Laboratory's MIDAS solution (North America fixed). Terrain comes from USGS 3DEP and fault traces from the USGS Quaternary Fault and Fold Database. The site covers the United States for now.</p>
+    <h3>Citing</h3>
+    <p class="cite">Cronin, V.S., and Resor, P.G., 2021, Algorithm for triangle strain: https://croninprojects.org/Vince/Geodesy/TriangleStrainAlgorithm.pdf.</p>
+    <p class="cite">Blewitt, G., Kreemer, C., Hammond, W.C., and Gazeaux, J., 2016, MIDAS robust trend estimator for accurate GPS station velocities without step detection: Journal of Geophysical Research: Solid Earth, v. 121, p. 2054–2068, doi:10.1002/2015JB012552.</p>
+    <p class="cite">Blewitt, G., Hammond, W.C., and Kreemer, C., 2018, Harnessing the GPS data explosion for interdisciplinary science: Eos, v. 99, doi:10.1029/2018EO104623.</p>
+    <p class="cite">Pajer, L., GPS Strain: Python implementation of the GPS triangle strain method, https://gps-strain.org.</p>
+    <p class="muted">Base maps: USGS The National Map (public domain); © OpenStreetMap contributors. Fonts: Gelasio and Archivo Black (SIL Open Font License). Code: MIT licence.</p>
+  </div>
+  <form method="dialog" class="dlg-foot"><button class="btn primary-ok">OK</button></form>
+</dialog>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script type="module" src="assets/app.js?v=__BUILD__"></script>
+<script type="module" src="assets/shell.js?v=__BUILD__"></script>
+</body>
+</html>
