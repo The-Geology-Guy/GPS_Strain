@@ -62,6 +62,10 @@ jobs:
           run AC63 AC62 AB37 -o alaska_vis --format png --visibility
           run P146 P149 P150 -o tahoe_copernicus --format png --basemap hillshade-copernicus --map strain
           run P146 P149 P150 -o tahoe_topo --format png --basemap usgs-topo --map strain
+          run P146 P149 P150 -o tahoe_topo_grey --format png --basemap usgs-topo --greyscale --map strain
+          for b in hillshade-color elevation slope; do
+            run P146 P149 P150 -o "tahoe_$b" --format png --basemap "$b" --map strain
+          done
           sleep 1
           if grep -q "unavailable" warnings.txt; then
             echo "::error::a terrain, tile or fault download failed (see warnings above)"; exit 1

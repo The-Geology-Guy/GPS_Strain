@@ -6,6 +6,7 @@ Examples::
     gps-strain P146 P149 P150 -o tahoe              # writes tahoe_symbol.pdf and tahoe_strain.pdf
     gps-strain P146 P149 P150 -o tahoe --format png --basemap usgs-topo
     gps-strain P146 P149 P150 -o tahoe --visibility      # thicker, white-edged overlays
+    gps-strain P146 P149 P150 -o tahoe --basemap usgs-topo --greyscale
     gps-strain --table my_stations.csv -o out --logo my_logo.png
     gps-strain --near 38.2 -122.3 --radius 30       # list stations near a point
     gps-strain --triangles RG24,P036,P039 P070,P039,RG24 -o raton   # several triangles on one map
@@ -39,8 +40,17 @@ def main(argv=None):
     p.add_argument("--map", default="both", choices=["both", "symbol", "strain"])
     p.add_argument("--basemap", default=plotting.DEFAULT_BASEMAP, choices=plotting.BASEMAPS,
                    help="hillshade (default: grey shaded relief from USGS 3DEP in the US, Copernicus "
-                        "elsewhere; no key), hillshade-3dep, hillshade-copernicus, USGS tiles "
-                        "(usgs-relief, usgs-topo, usgs-imagery; US only), synthetic (offline preview) or none")
+                        "elsewhere; no key), hillshade-3dep, hillshade-copernicus, hillshade-color, "
+                        "elevation, slope, USGS tiles (usgs-relief, usgs-topo, usgs-imagery; US only), "
+                        "synthetic (offline preview) or none")
+    p.add_argument("--light-azimuth", type=float, default=315.0, metavar="DEG",
+                   help="hillshade light direction, degrees from north (default 315, northwest)")
+    p.add_argument("--sun-altitude", type=float, default=30.0, metavar="DEG",
+                   help="hillshade sun altitude above the horizon (default 30)")
+    p.add_argument("--exaggeration", type=float, default=2.0,
+                   help="hillshade vertical exaggeration (default 2)")
+    p.add_argument("--greyscale", "--grayscale", action="store_true",
+                   help="draw the USGS tile basemaps (usgs-topo, usgs-relief, usgs-imagery) in grey")
     p.add_argument("--visibility", action="store_true",
                    help="increase visibility: thicker lines and arrows with white edges, white panels "
                         "behind the scale bar and north arrow (easier to read over dark relief)")
@@ -54,6 +64,8 @@ def main(argv=None):
                    help="several triangles (comma-separated station IDs) for network maps")
     a = p.parse_args(argv)
     logging.basicConfig(format="warning: %(message)s", level=logging.WARNING, stream=sys.stderr)
+    from .terrain import HillshadeStyle
+    tstyle = HillshadeStyle(azimuth=a.light_azimuth, altitude=a.sun_altitude, exaggeration=a.exaggeration)
 
     if a.triangles:
         src = data.read_table(a.table, units=a.units) if a.table else data.load_midas(a.plate)
@@ -66,7 +78,8 @@ def main(argv=None):
                 out = f"{a.output}_network_{kind}.{a.format}"
                 plotting.network_map(results, tables, out, kind=kind, basemap=a.basemap, title=a.title,
                                      visibility=a.visibility, faults=not a.no_faults,
-                                     fault_source=a.fault_source)
+                                     fault_source=a.fault_source, greyscale=a.greyscale,
+                                     terrain_style=tstyle)
                 print(f"Wrote {out}")
         return 0
 
@@ -92,7 +105,8 @@ def main(argv=None):
     print(result.report())
     if a.output:
         kw = dict(title=a.title, data_label=label, logo=a.logo, basemap=a.basemap, visibility=a.visibility,
-                  faults=not a.no_faults, fault_source=a.fault_source)
+                  faults=not a.no_faults, fault_source=a.fault_source, greyscale=a.greyscale,
+                  terrain_style=tstyle)
         if a.map in ("both", "symbol"):
             out = f"{a.output}_symbol.{a.format}"
             plotting.symbol_map(result, table, out, **kw)

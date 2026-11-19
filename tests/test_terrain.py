@@ -455,3 +455,59 @@ def test_map_survives_fault_service_failure(monkeypatch):
     fig = plotting.strain_map(r, t, None, basemap="none")
     assert any("Faults unavailable" in x.get_text() for x in fig.axes[0].texts)
     plt.close("all")
+
+
+def test_greyscale_tile_basemap():
+    import matplotlib.pyplot as plt
+    from PIL import Image
+
+    from gps_strain import compute_strain, plotting
+    from gps_strain.data import from_records
+
+    def coloured_tile(z, x, y):
+        a = np.zeros((256, 256, 3), np.uint8)
+        a[..., 0], a[..., 1], a[..., 2] = 40, 160, 220   # USGS-topo-like blue
+        a[:128, :, :] = (120, 170, 90)                   # and green
+        return Image.fromarray(a)
+
+    t = from_records(TAHOE)
+    r = compute_strain(t, mc_samples=0)
+    for grey in (False, True):
+        fig = plotting.strain_map(r, t, None, basemap="usgs-topo", tile_source=coloured_tile,
+                                  faults=False, greyscale=grey)
+        img = fig.axes[0].images[0].get_array()
+        same = np.ptp(np.asarray(img)[..., :3].astype(int), axis=-1).max() == 0
+        assert same == grey
+    g = plotting.to_greyscale(np.array([[[40, 160, 220]]], np.uint8))
+    assert g.shape == (1, 1, 3) and g[0, 0, 0] == round(0.2126 * 40 + 0.7152 * 160 + 0.0722 * 220)
+    plt.close("all")
+
+
+@pytest.mark.parametrize("mode", ["grey", "color", "elevation", "slope"])
+def test_terrain_modes(mode):
+    ext = _merc_ext(-120.6, -119.9, 39.1, 39.7)
+    z = terrain.synthetic_dem(ext, 240, 200) + 500
+    z[:, :30] = 0.0  # sea
+    img = terrain.hillshade_rgb(z, ext, terrain.HillshadeStyle(mode=mode))
+    assert img.shape == (200, 240, 3) and img.min() >= 0 and img.max() <= 1
+    np.testing.assert_allclose(img[100, 5], terrain.WATER_RGB)
+    land = ~terrain.water_mask(z)
+    grey = np.ptp(img[land], axis=-1).max() < 1e-9
+    assert grey == (mode in ("grey", "slope"))
+
+
+def test_slope_mode_darker_where_steeper():
+    ext = _merc_ext(-120.6, -119.2, 39.1, 39.7)
+    e = _plane(ext, 120, 40, 1.0, 0.0) - 500      # ground metres east of the centre
+    z = 1000 + np.where(e < 0, 0.02 * e, 0.5 * e)  # gentle west half, steep east half, no step
+    img = terrain.hillshade_rgb(z, ext, terrain.HillshadeStyle(mode="slope"))
+    assert img[:, 5:55, 0].mean() > img[:, 65:115, 0].mean() + 0.3
+    with pytest.raises(ValueError):
+        terrain.hillshade_rgb(z, ext, terrain.HillshadeStyle(mode="stamen"))
+
+
+def test_basemap_menu_lists_every_choice():
+    from gps_strain import plotting
+
+    for key in plotting.BASEMAP_LABELS:
+        assert key in plotting.BASEMAPS

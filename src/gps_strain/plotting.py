@@ -96,7 +96,17 @@ FAULT_COLOR = "#e6d43a"   # GEOSLAM / Cronin report figures: yellow fault traces
 FAULT_ZORDER = 10         # above the terrain and grid, below every map symbol
 FAULT_LABEL = "Fault"     # legend entry; the credit line names the database
 HILLSHADE_SOURCES = {"hillshade": "auto", "hillshade-3dep": "3dep", "hillshade-copernicus": "copernicus"}
-BASEMAPS = [*HILLSHADE_SOURCES, *bm.PROVIDERS, "synthetic", "none"]
+# other terrain looks drawn from the same DEM (the choices geoslam.org's report view offers)
+TERRAIN_BASEMAPS = {"hillshade-color": "color", "elevation": "elevation", "slope": "slope"}
+BASEMAPS = [*HILLSHADE_SOURCES, *TERRAIN_BASEMAPS, *bm.PROVIDERS, "synthetic", "none"]
+BASEMAP_LABELS = {
+    "hillshade": "Grey hillshade", "hillshade-color": "Hillshade with elevation colours",
+    "elevation": "Elevation colours", "slope": "Slope",
+    "usgs-topo": "USGS topographic", "usgs-relief": "USGS shaded relief", "usgs-imagery": "USGS imagery",
+    "none": "None",
+}
+"""Menu labels for a web/desktop "Map background" dropdown (with a greyscale
+checkbox that applies to the USGS tile maps)."""
 
 
 # ---------------------------------------------------------------------------
@@ -240,8 +250,18 @@ def map_extent(table, bounds=0.5):
     return lon.min() - bounds, lon.max() + bounds, lat.min() - bounds, lat.max() + bounds
 
 
+def to_greyscale(img):
+    """RGB(A) image -> grey RGB with the same luminance (Rec. 709 weights)."""
+    a = np.asarray(img)
+    scale = 255.0 if a.dtype == np.uint8 else 1.0
+    rgb = a[..., :3].astype(float) / scale
+    y = rgb @ np.array([0.2126, 0.7152, 0.0722])
+    g = np.repeat(y[..., None], 3, axis=-1)
+    return (g * 255).round().astype(np.uint8) if scale == 255.0 else g
+
+
 def draw_basemap(ax, ext, basemap=DEFAULT_BASEMAP, tile_source=None, zoom=None, dem_source=None,
-                 terrain_style=None):
+                 terrain_style=None, greyscale=False):
     """Draw the background of a map whose Web Mercator extent is ``ext``.
 
     ``basemap``:
@@ -249,25 +269,35 @@ def draw_basemap(ax, ext, basemap=DEFAULT_BASEMAP, tile_source=None, zoom=None, 
     * ``"hillshade"`` (default): grey shaded relief from a DEM, as on GEOSLAM's
       printed maps. USGS 3DEP in the US, Copernicus GLO-30/90 elsewhere; no key.
       ``"hillshade-3dep"`` / ``"hillshade-copernicus"`` force one DEM.
+    * ``"hillshade-color"``, ``"elevation"``, ``"slope"``: other looks from the
+      same DEM (the choices in geoslam.org's report view).
     * ``"usgs-relief"``, ``"usgs-topo"``, ``"usgs-imagery"``: USGS tiles (US only).
     * ``"synthetic"``: the same grey hillshade of made-up terrain (offline preview).
     * ``"none"`` or None: no background.
 
-    ``dem_source(ext, width, height) -> elevations`` overrides the DEM download.
+    ``greyscale=True`` draws the USGS tile maps in grey (the hillshade is
+    grey already). ``dem_source(ext, width, height) -> elevations`` overrides
+    the DEM download.
     Returns the attribution text (or None). If the download fails the map gets
     a plain background and a note, and the rest of the figure is still drawn.
     """
     if basemap in (None, "none"):
         return None
     style = terrain_style or terrain.DEFAULT_STYLE
+    if basemap in TERRAIN_BASEMAPS:
+        from dataclasses import replace
+        style = replace(style, mode=TERRAIN_BASEMAPS[basemap])
     try:
-        if basemap in HILLSHADE_SOURCES or basemap == "synthetic":
-            src = terrain.synthetic_dem if basemap == "synthetic" else (dem_source or HILLSHADE_SOURCES[basemap])
+        if basemap in HILLSHADE_SOURCES or basemap in TERRAIN_BASEMAPS or basemap == "synthetic":
+            src = (terrain.synthetic_dem if basemap == "synthetic"
+                   else dem_source or HILLSHADE_SOURCES.get(basemap, "auto"))
             img, credit = terrain.terrain_image(ext, source=src, style=style)
             ax.imshow(img, extent=ext, origin="upper", interpolation="bilinear", zorder=0)
         else:
             prov = bm.PROVIDERS[basemap]
             img, iext = bm.fetch_basemap(ext, prov, zoom=zoom, tile_source=tile_source)
+            if greyscale:
+                img = to_greyscale(img)
             ax.imshow(img, extent=iext, interpolation="spline36", zorder=0, origin="upper")
             credit = prov.attribution
     except KeyError:
@@ -331,7 +361,7 @@ def _fault_handle(ax, style=CLASSIC):
 
 def setup_map(ax, table, bounds=0.5, basemap=DEFAULT_BASEMAP, tile_source=None, zoom=None,
               attribution=True, dem_source=None, terrain_style=None, max_width=None, style=CLASSIC,
-              faults=False, fault_source="auto"):
+              faults=False, fault_source="auto", greyscale=False):
     """Prepare a Web Mercator map axes with basemap and labelled lon/lat graticule.
 
     ``max_width`` (Web Mercator metres) zooms the map in to at most that width,
@@ -368,7 +398,7 @@ def setup_map(ax, table, bounds=0.5, basemap=DEFAULT_BASEMAP, tile_source=None, 
     ax.set_xlim(ext[0], ext[1])
     ax.set_ylim(ext[2], ext[3])
     ax.set_aspect("equal", adjustable="box")
-    credit = draw_basemap(ax, ext, basemap, tile_source, zoom, dem_source, terrain_style)
+    credit = draw_basemap(ax, ext, basemap, tile_source, zoom, dem_source, terrain_style, greyscale)
     fault_credit = draw_faults(ax, ext, faults, fault_source, style)
     if fault_credit:
         credit = f"{credit}\n{fault_credit}" if credit else fault_credit
@@ -720,7 +750,7 @@ def _default_title(data_label, one_line):
 def symbol_map(result: StrainResult, table, path=None, title=None, data_label="NGL MIDAS",
                logo=None, basemap=DEFAULT_BASEMAP, tile_source=None, dem_source=None, bounds=0.5,
                scale_km=None, min_strain=0.1, max_strain=300.0, zoom=None, terrain_style=None,
-               fit_symbol=True, visibility=False, faults=True, fault_source="auto"):
+               fit_symbol=True, visibility=False, faults=True, fault_source="auto", greyscale=False):
     """Landscape strain-rate symbol map (the 2020 ``symbol_map_full`` layout).
 
     ``visibility=True`` ("Increase visibility") draws the overlays thicker
@@ -729,7 +759,8 @@ def symbol_map(result: StrainResult, table, path=None, title=None, data_label="N
     ``faults=True`` draws mapped Quaternary faults (USGS; GEM outside the US)
     between the terrain and the map symbols; ``faults=False`` leaves them off.
     With ``basemap="synthetic"`` they are off unless a list is given (real
-    faults over made-up terrain would mislead).
+    faults over made-up terrain would mislead). ``greyscale=True`` draws the
+    USGS tile basemaps (topo, relief, imagery) in grey.
 
     With ``fit_symbol`` (default) the map zooms in, if needed, so the symbol
     at the centroid stays inside the triangle; the symbol keeps its size on
@@ -744,7 +775,7 @@ def symbol_map(result: StrainResult, table, path=None, title=None, data_label="N
         fit = symbol_fit_width(result, table, min_strain, max_strain) if fit_symbol else None
         setup_map(ax, table, bounds, basemap, tile_source, zoom, dem_source=dem_source,
                   terrain_style=terrain_style, max_width=fit, style=style,
-                  faults=_faults_for(basemap, faults), fault_source=fault_source)
+                  faults=_faults_for(basemap, faults), fault_source=fault_source, greyscale=greyscale)
         x, y = draw_triangle_and_sites(ax, table, style=style)
         width = ax.get_xlim()[1] - ax.get_xlim()[0]
         size = SYMBOL_FRAC * (min(width, fit) if fit else width)
@@ -777,7 +808,7 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
                velocity_label="Velocity Relative to North America", logo=None, basemap=DEFAULT_BASEMAP,
                tile_source=None, dem_source=None, bounds=0.5, scale_km=None, ref_velocity=None,
                zoom=None, terrain_style=None, fit_ellipse=True, visibility=False, faults=True,
-               fault_source="auto"):
+               fault_source="auto", greyscale=False):
     """Portrait strain-ellipse map with velocities (the 2020 ``strain_map_full`` layout).
 
     ``visibility=True`` ("Increase visibility") draws the overlays thicker
@@ -786,7 +817,8 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
     ``faults=True`` draws mapped Quaternary faults (USGS; GEM outside the US)
     between the terrain and the map symbols; ``faults=False`` leaves them off.
     With ``basemap="synthetic"`` they are off unless a list is given (real
-    faults over made-up terrain would mislead).
+    faults over made-up terrain would mislead). ``greyscale=True`` draws the
+    USGS tile basemaps (topo, relief, imagery) in grey.
 
     With ``fit_ellipse`` (default) the map zooms in, if needed, so the strain
     ellipse at the centroid stays inside the triangle, as on the 2020 maps;
@@ -801,7 +833,7 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
         fit = ellipse_fit_width(result, table) if fit_ellipse else None
         setup_map(ax, table, bounds, basemap, tile_source, zoom, dem_source=dem_source,
                   terrain_style=terrain_style, max_width=fit, style=style,
-                  faults=_faults_for(basemap, faults), fault_source=fault_source)
+                  faults=_faults_for(basemap, faults), fault_source=fault_source, greyscale=greyscale)
         x, y = draw_triangle_and_sites(ax, table, style=style)
         mx0, mx1 = ax.get_xlim()
         width = mx1 - mx0
@@ -903,7 +935,7 @@ def network_map(results, tables, path=None, kind="symbol", basemap=DEFAULT_BASEM
                 tile_source=None, dem_source=None, bounds=0.5, scale_km=None, tri_colors=None, lines=None,
                 velocities=True, min_strain=0.1, max_strain=None, zoom=None, title=None,
                 figsize=(15, 15), terrain_style=None, fit=True, visibility=False, faults=True,
-                fault_source="auto"):
+                fault_source="auto", greyscale=False):
     """Several triangles on one map, like the 2021 Raton, NM figures.
 
     ``kind="symbol"`` draws each triangle's strain-rate symbol at its centroid;
@@ -925,7 +957,7 @@ def network_map(results, tables, path=None, kind="symbol", basemap=DEFAULT_BASEM
         ax = fig.add_axes([0.05, 0.04, 0.78, 0.9])
         setup_map(ax, stations, bounds, basemap, tile_source, zoom, dem_source=dem_source,
                   terrain_style=terrain_style, style=style, faults=_faults_for(basemap, faults),
-                  fault_source=fault_source)
+                  fault_source=fault_source, greyscale=greyscale)
         width = ax.get_xlim()[1] - ax.get_xlim()[0]
         sx, sy = bm.lonlat_to_merc(stations["lon"].to_numpy(float), stations["lat"].to_numpy(float))
         if velocities:

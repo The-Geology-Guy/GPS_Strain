@@ -39,8 +39,12 @@ Command line:
 # writes tahoe_symbol.pdf and tahoe_strain.pdf
 gps-strain P146 P149 P150 -o tahoe
 
-# USGS topographic map tiles instead of the grey hillshade (US only)
+# USGS topographic map tiles instead of the grey hillshade (US only), optionally in grey
 gps-strain P146 P149 P150 -o tahoe --basemap usgs-topo
+gps-strain P146 P149 P150 -o tahoe --basemap usgs-topo --greyscale
+
+# other terrain looks and lighting (light from the northwest at 30° by default)
+gps-strain P146 P149 P150 -o tahoe --basemap hillshade-color --light-azimuth 270 --sun-altitude 20
 
 # the sheets carry a block-letter "GPS STRAIN" wordmark; swap in your own logo (file or URL)
 gps-strain P146 P149 P150 -o tahoe --logo my_logo.png
@@ -89,7 +93,8 @@ Original 2020–2021 figures, for comparison, are in [docs/reference_2020/](docs
 |---|---|---|
 | `hillshade` (default) | Grey shaded relief computed from elevation data, the same look as GEOSLAM's printed maps. Water is left pale. | USGS 3DEP in the US (public domain), Copernicus GLO-30/90 elsewhere (free licence, credit printed on the map). No key, no print limits. |
 | `hillshade-3dep`, `hillshade-copernicus` | The same, forcing one elevation source | As above |
-| `usgs-relief`, `usgs-topo`, `usgs-imagery` | USGS The National Map tiles (the same maps geoslam.org shows) | Public domain, no key; **US and territories only** |
+| `hillshade-color`, `elevation`, `slope` | Other looks from the same elevation data: hillshade with elevation colours, elevation colours only, or slope (darker = steeper), the choices in geoslam.org's report view | As above |
+| `usgs-relief`, `usgs-topo`, `usgs-imagery` | USGS The National Map tiles (the same maps geoslam.org shows); `--greyscale` draws them in grey | Public domain, no key; **US and territories only** |
 | `synthetic` | Grey hillshade of made-up terrain, for offline previews and tests | None (labelled on the map as not real) |
 | `none` | No background | |
 

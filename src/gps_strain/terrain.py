@@ -71,6 +71,17 @@ class HillshadeStyle:
     exaggeration: float = 2.0
     dark: float = 0.18
     light: float = 0.90
+    mode: str = "grey"   # grey | color (hillshade + elevation colours) | elevation | slope
+
+
+TERRAIN_MODES = {
+    "grey": "Grey hillshade",
+    "color": "Hillshade with elevation colours",
+    "elevation": "Elevation colours",
+    "slope": "Slope",
+}
+# GEOSLAM report.terrain_rgb's elevation palette (low green to high pale)
+ELEVATION_COLORS = ["#4f7a5a", "#93ad78", "#d8cf9a", "#c7a274", "#9c7a5c", "#f2efe9"]
 
 
 DEFAULT_STYLE = HillshadeStyle()
@@ -396,13 +407,53 @@ def shade(z, extent_merc, style: HillshadeStyle = DEFAULT_STYLE) -> np.ndarray:
     return s
 
 
+def slope_degrees(z, extent_merc) -> np.ndarray:
+    """Ground slope in degrees on a Web Mercator grid (true row spacing)."""
+    z = np.asarray(z, float)
+    height, width = z.shape
+    x0, x1, y0, y1 = extent_merc
+    _, lat = grid_lonlat(extent_merc, width, height)
+    coslat = np.cos(np.radians(lat))[:, None]
+    zf = np.where(np.isfinite(z), z, np.nanmean(z) if np.isfinite(z).any() else 0.0)
+    g_row, g_col = np.gradient(zf, (y1 - y0) / height, (x1 - x0) / width)
+    return np.degrees(np.arctan(np.hypot(g_col, g_row) / coslat))
+
+
 def hillshade_rgb(z, extent_merc, style: HillshadeStyle = DEFAULT_STYLE) -> np.ndarray:
-    """Grey RGB image (rows north to south) with water in a pale fill."""
+    """Terrain RGB image (rows north to south) with water in a pale fill.
+
+    ``style.mode`` (the same choices as geoslam.org's report view):
+    ``grey`` hillshade (default), ``color`` hillshade blended with elevation
+    colours, ``elevation`` colours only, or ``slope`` (darker = steeper).
+    """
+    from matplotlib.colors import LinearSegmentedColormap
+
+    if style.mode not in TERRAIN_MODES:
+        raise ValueError(f"unknown terrain mode {style.mode!r}; choose from {', '.join(TERRAIN_MODES)}")
     water = water_mask(z)
     land = np.where(water, np.nan, z)
-    hs = shade(land, extent_merc, style)
-    g = style.dark + (style.light - style.dark) * np.nan_to_num(hs, nan=0.5)
-    img = np.dstack([g, g, g])
+    if style.mode == "slope":
+        sl = slope_degrees(land, extent_merc)
+        ok = np.isfinite(land)
+        top = max(np.nanpercentile(sl[ok], 99), 1e-6) if ok.any() else 1.0
+        v = np.clip(sl / top, 0, 1)
+        g = style.light - (style.light - style.dark) * v
+        img = np.dstack([g, g, g])
+    elif style.mode == "grey":
+        hs = shade(land, extent_merc, style)
+        g = style.dark + (style.light - style.dark) * np.nan_to_num(hs, nan=0.5)
+        img = np.dstack([g, g, g])
+    else:
+        cmap = LinearSegmentedColormap.from_list("gps_strain_terrain", ELEVATION_COLORS)
+        ok = np.isfinite(land)
+        lo, hi = np.nanpercentile(land[ok], [1, 99]) if ok.any() else (0.0, 1.0)
+        c = cmap(np.clip((np.nan_to_num(land, nan=lo) - lo) / max(hi - lo, 1e-6), 0, 1))[..., :3]
+        if style.mode == "elevation":
+            img = c
+        else:  # GEOSLAM's soft-light blend of colour and hillshade
+            h = np.nan_to_num(shade(land, extent_merc, style), nan=0.5)[..., None]
+            img = np.clip(c * (0.45 + 0.75 * h), 0, 1)
+    img = np.array(img, float)
     img[water] = WATER_RGB
     return img
 
