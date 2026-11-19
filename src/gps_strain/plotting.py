@@ -538,6 +538,22 @@ def ellipse_legend_box(ax):
     leg.get_frame().set_linewidth(0.5)
     leg.get_frame().set_alpha(0.5)
     plt.setp(leg.get_title(), fontsize=14, fontfamily=SERIF)
+    return leg
+
+
+def _top_align(fig, table, leg, ax_leg, ax_box, box_top):
+    """Line up the tops of the ellipse legend and the velocity-key box with
+    the top of the speed table (the row of boxes under the portrait map)."""
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    to_fig = fig.transFigure.inverted()
+    top = to_fig.transform((0, table.get_window_extent(renderer).y1))[1]
+    p = ax_box.get_position()
+    ax_box.set_position([p.x0, top - box_top * p.height, p.width, p.height])
+    pl = ax_leg.get_position()
+    leg.set_loc("upper center")
+    leg.borderaxespad = 0.0
+    leg.set_bbox_to_anchor((pl.x0 + pl.width / 2, top), transform=fig.transFigure)
 
 
 def _table(ax, cells, header, fontsize=11.25, scale=1.75):
@@ -653,7 +669,8 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
         ax_logo.set_position([lpos.x0, lpos.y0, mpos.x1 - lpos.x0, lpos.height])
         draw_logo(ax_logo, logo, align="right")
 
-        ellipse_legend_box(fig.add_subplot(gs[33:37, :10]))
+        ax_leg = fig.add_subplot(gs[33:37, :10])
+        leg = ellipse_legend_box(ax_leg)
 
         ax_v = fig.add_subplot(gs[33:37, 10:21])
         ax_v.axis("off")
@@ -675,8 +692,9 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
                   fontsize=12.5)
 
         speed = np.hypot(ve, vn)
-        _table(fig.add_subplot(gs[33:36, 21:]), [[s, f"{v:.6f}"] for s, v in zip(table["site"], speed)],
-               ["sites", "Speed (mm/yr)"])
+        speed_tab = _table(fig.add_subplot(gs[33:36, 21:]),
+                           [[s, f"{v:.6f}"] for s, v in zip(table["site"], speed)], ["sites", "Speed (mm/yr)"])
+        _top_align(fig, speed_tab, leg, ax_leg, ax_v, box_top=0.92)
 
         cells = [[r.site, f"{r.lon:.6f}", f"{r.lat:.6f}", f"{r.ve * 1000:.6f}", f"{r.sig_e * 1000:.6f}",
                   f"{r.vn * 1000:.6f}", f"{r.sig_n * 1000:.6f}"] for r in table.itertuples()]

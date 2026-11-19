@@ -312,3 +312,27 @@ def test_network_ellipses_shrink_to_fit_their_own_triangles():
         radii.append(np.max(np.hypot(px - tx.mean(), py - ty.mean())))
     assert radii[1] < radii[0] <= 0.06 * width * 1.3   # only the small triangle's ellipse shrank
     plt.close("all")
+
+
+def test_portrait_boxes_are_top_aligned():
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import FancyBboxPatch
+    from matplotlib.table import Table
+
+    from gps_strain import compute_strain, plotting
+    from gps_strain.data import from_records
+
+    t = from_records(ALASKA)
+    r = compute_strain(t, mc_samples=0)
+    fig = plotting.strain_map(r, t, None, basemap="none")
+    fig.canvas.draw()
+    rend = fig.canvas.get_renderer()
+    tables = [c for a in fig.axes for c in a.get_children() if isinstance(c, Table)]
+    speed = next(tb for tb in tables if len(tb.get_celld()) == 2 * (len(t) + 1))
+    legend = next(a.get_legend() for a in fig.axes
+                  if a.get_legend() and a.get_legend().get_title().get_text() == "Strain Ellipse Legend")
+    box = next(p for a in fig.axes for p in a.patches if isinstance(p, FancyBboxPatch))
+    tops = [speed.get_window_extent(rend).y1, legend.get_frame().get_window_extent(rend).y1,
+            box.get_window_extent(rend).y1]
+    assert max(tops) - min(tops) < 2.0, tops
+    plt.close("all")
