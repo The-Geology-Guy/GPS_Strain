@@ -287,3 +287,28 @@ def test_wordmark_right_edge_on_map_axis():
     axis_px = ax.get_window_extent().x1
     assert abs(right_px - axis_px) < 2.0
     plt.close("all")
+
+
+def test_network_ellipses_shrink_to_fit_their_own_triangles():
+    import matplotlib.pyplot as plt
+
+    from gps_strain import compute_strain, plotting
+    from gps_strain.data import from_records
+
+    big = from_records(TAHOE)
+    small = from_records([TAHOE[0], TAHOE[1],                     # a smaller triangle inside the map
+                          dict(TAHOE[2], site="P999", lat=39.40, lon=-120.25)])
+    rs = [compute_strain(t, mc_samples=0) for t in (big, small)]
+    fig = plotting.network_map(rs, [big, small], None, kind="ellipse", basemap="none")
+    ax = fig.axes[0]
+    outlines = [ln for ln in ax.lines if ln.get_zorder() == 34]
+    assert len(outlines) == 2
+    width = ax.get_xlim()[1] - ax.get_xlim()[0]
+    radii = []
+    for ln, t in zip(outlines, (big, small)):
+        tx, ty = bm.lonlat_to_merc(t["lon"].to_numpy(float), t["lat"].to_numpy(float))
+        px, py = ln.get_data()
+        assert _inside(np.asarray(px), np.asarray(py), tx, ty)
+        radii.append(np.max(np.hypot(px - tx.mean(), py - ty.mean())))
+    assert radii[1] < radii[0] <= 0.06 * width * 1.3   # only the small triangle's ellipse shrank
+    plt.close("all")

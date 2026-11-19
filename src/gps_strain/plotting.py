@@ -322,24 +322,24 @@ def _sides_from_centroid(x, y):
     return out
 
 
-def ellipse_fit_width(result: StrainResult, table, frac=ELLIPSE_FRAC, margin=FIT_MARGIN):
-    """Largest map width (Web Mercator metres) at which the strain ellipse,
-    drawn with radius ``frac`` x map width at the centroid, stays inside the
-    station triangle. Uses the ellipse's support function: the drawing
-    (initial circle and deformed ellipse F = I + kE) reaches ``R max(1,
-    |F^T n|)`` toward a side with outward normal n."""
-    x, y = bm.lonlat_to_merc(table["lon"].to_numpy(float), table["lat"].to_numpy(float))
-    F = np.eye(2) + exaggeration_for(result) * result.strain_tensor
-    widths = [d / (frac * max(1.0, float(np.linalg.norm(F.T @ n))) * margin)
-              for n, d in _sides_from_centroid(x, y)]
-    return min(widths) if widths else None
+def ellipse_max_radius(result: StrainResult, x, y, exaggeration=None, margin=FIT_MARGIN):
+    """Largest ellipse radius (map units) that keeps the drawing inside the
+    station polygon (x, y in map units) when centred on the centroid.
+
+    Uses the ellipse's support function: the initial circle and the deformed
+    ellipse F = I + kE reach ``R max(1, |F^T n|)`` toward a side with
+    outward normal n.
+    """
+    k = exaggeration or exaggeration_for(result)
+    F = np.eye(2) + k * result.strain_tensor
+    radii = [d / (max(1.0, float(np.linalg.norm(F.T @ n))) * margin) for n, d in _sides_from_centroid(x, y)]
+    return min(radii) if radii else None
 
 
-def symbol_fit_width(result: StrainResult, table, min_strain=0.1, max_strain=300.0,
-                     frac=SYMBOL_FRAC, margin=FIT_MARGIN):
-    """Largest map width at which the strain-rate symbol stays inside the
-    triangle (the symbol treated as a circle of its largest arm)."""
-    x, y = bm.lonlat_to_merc(table["lon"].to_numpy(float), table["lat"].to_numpy(float))
+def symbol_max_size(result: StrainResult, x, y, min_strain=0.1, max_strain=300.0, margin=FIT_MARGIN):
+    """Largest symbol ``size`` (see :func:`draw_strain_symbol`) that keeps the
+    strain-rate symbol inside the station polygon (treated as a circle of its
+    longest arm, plus the arrow-head half width)."""
     max_strain = max(max_strain, abs(result.e1) * NANO, abs(result.e2) * NANO)
     reach = 0.0
     for e in (result.e1, result.e2):
@@ -349,8 +349,28 @@ def symbol_fit_width(result: StrainResult, table, min_strain=0.1, max_strain=300
         reach = max(reach, f if e > 0 else f + 0.06)  # contraction arrows start 0.06 out
     if reach == 0:
         return None
-    reach = math.hypot(reach, 0.17)  # arrow-head half width
-    return min(d / (frac * reach * margin) for _, d in _sides_from_centroid(x, y))
+    reach = math.hypot(reach, 0.17)
+    return min(d / (reach * margin) for _, d in _sides_from_centroid(x, y))
+
+
+def _merc_xy(table):
+    return bm.lonlat_to_merc(table["lon"].to_numpy(float), table["lat"].to_numpy(float))
+
+
+def ellipse_fit_width(result: StrainResult, table, frac=ELLIPSE_FRAC, margin=FIT_MARGIN):
+    """Largest map width (Web Mercator metres) at which the strain ellipse,
+    drawn with radius ``frac`` x map width at the centroid, stays inside the
+    station triangle."""
+    r = ellipse_max_radius(result, *_merc_xy(table), margin=margin)
+    return None if r is None else r / frac
+
+
+def symbol_fit_width(result: StrainResult, table, min_strain=0.1, max_strain=300.0,
+                     frac=SYMBOL_FRAC, margin=FIT_MARGIN):
+    """Largest map width at which the strain-rate symbol (half-length ``frac``
+    x map width for 300 nanostrain) stays inside the triangle."""
+    s = symbol_max_size(result, *_merc_xy(table), min_strain, max_strain, margin)
+    return None if s is None else s / frac
 
 
 def draw_triangle_and_sites(ax, table, colors=SITE_COLORS, legend_loc="upper center", ms=10):
@@ -685,14 +705,16 @@ def _stations_union(tables):
 def network_map(results, tables, path=None, kind="symbol", basemap=DEFAULT_BASEMAP,
                 tile_source=None, dem_source=None, bounds=0.5, scale_km=None, tri_colors=None, lines=None,
                 velocities=True, min_strain=0.1, max_strain=None, zoom=None, title=None,
-                figsize=(15, 15), terrain_style=None):
+                figsize=(15, 15), terrain_style=None, fit=True):
     """Several triangles on one map, like the 2021 Raton, NM figures.
 
     ``kind="symbol"`` draws each triangle's strain-rate symbol at its centroid;
     ``kind="ellipse"`` draws each triangle's strain ellipse (outlined in the
-    triangle's colour) with the dashed triangle. All symbols/ellipses share one
-    scale, so sizes are comparable between triangles. Station velocity arrows
-    are drawn once per station.
+    triangle's colour) with the dashed triangle. Symbols and ellipses share one
+    strain scale, so their shapes are comparable between triangles; with
+    ``fit=True`` (default) each one is drawn smaller where needed so it stays
+    inside its own triangle (the map cannot zoom in for every triangle at
+    once). Station velocity arrows are drawn once per station.
     """
     if len(results) != len(tables):
         raise ValueError("results and tables must have the same length")
@@ -728,12 +750,18 @@ def network_map(results, tables, path=None, kind="symbol", basemap=DEFAULT_BASEM
             if lines:
                 ax.plot(np.append(x, x[0]), np.append(y, y[0]), color=c, ls="--", lw=2, alpha=0.6, zorder=20)
             if kind == "ellipse":
-                draw_ellipse(ax, r, center=cen, radius=0.06 * width, exaggeration=kexag, axis_lw=3, zorder=30)
+                rad = 0.06 * width
+                if fit:
+                    rad = min(rad, ellipse_max_radius(r, x, y, exaggeration=kexag) or rad)
+                draw_ellipse(ax, r, center=cen, radius=rad, exaggeration=kexag, axis_lw=3, zorder=30)
                 th = np.linspace(0, 2 * np.pi, 361)
                 E = (np.eye(2) + kexag * r.strain_tensor) @ np.vstack([np.cos(th), np.sin(th)])
-                ax.plot(cen[0] + 0.06 * width * E[0], cen[1] + 0.06 * width * E[1], color=c, lw=2, zorder=34)
+                ax.plot(cen[0] + rad * E[0], cen[1] + rad * E[1], color=c, lw=2, zorder=34)
             else:
-                draw_strain_symbol(ax, r, cen, 0.12 * width, min_strain, mmax)
+                size = 0.12 * width
+                if fit:
+                    size = min(size, symbol_max_size(r, x, y, min_strain, mmax) or size)
+                draw_strain_symbol(ax, r, cen, size, min_strain, mmax)
             handles.append(Line2D([0], [0], color=c, ls="--", lw=2, label="–".join(r.sites)))
         leg = ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.01, 1.0),
                         prop={"family": SERIF, "size": 10}, title="Triangles", framealpha=0.9)
