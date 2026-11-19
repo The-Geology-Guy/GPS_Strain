@@ -49,6 +49,8 @@ Run on a normal connection on 18 Nov 2026 (`gps-strain P146 P149 P150 -o tahoe`,
 
 Built to match **geoslam.org**: the same Windows-98 toolkit, desktop and mobile layouts, and Cronin reviewing the site before it is indexed.
 
+**Live (18 Nov 2026): https://gps-strain.org** (GitHub Pages from `.github/workflows/pages.yml`, custom domain set, certificate issued; "Enforce HTTPS" to tick once GitHub's DNS check finishes). Tested in Chrome: station list (8,294 US stations), Lake Tahoe example, the portrait sheet on grey 3DEP hillshade with USGS faults, the landscape sheet on greyscale USGS topo. Still `noindex` until Vince Cronin's review. To do: phone testing, faster map-sheet previews (tiles download one by one inside Pyodide), first-load time (~15 s while Python starts).
+
 **Scope (decided 18 Nov 2026): United States only for now** (CONUS, Alaska, Hawaii, Puerto Rico and territories, matching USGS 3DEP and Quaternary-fault coverage). Stations outside it are not offered; terrain comes from USGS 3DEP and faults from the USGS database only, so Copernicus and GEM are not used on the site. The Python package stays global. The solver is small enough to port to JavaScript or to run with Pyodide.
 
 - **Built (18 Nov 2026):** `web/` (the GEOSLAM Windows 98 shell, copied), `src/gps_strain/web.py` (JSON bridge for Pyodide), `.github/workflows/pages.yml`.
