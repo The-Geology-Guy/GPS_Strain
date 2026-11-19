@@ -511,3 +511,25 @@ def test_basemap_menu_lists_every_choice():
 
     for key in plotting.BASEMAP_LABELS:
         assert key in plotting.BASEMAPS
+
+
+def test_usgs_hiccups_are_retried_then_fall_back_to_half_size(monkeypatch, tmp_path):
+    """3DEP sometimes answers 502 (seen in CI): retry, and if a large export
+    keeps failing, draw the terrain at half resolution."""
+    monkeypatch.setenv("GPS_STRAIN_CACHE", str(tmp_path))
+    monkeypatch.setattr(terrain, "RETRY_WAIT", (0, 0, 0))
+    calls = []
+
+    def flaky(url, params=None, timeout=0):
+        w, h = (int(v) for v in params["size"].split(","))
+        calls.append(w)
+        if len(calls) <= 2 or w > 300:        # two 502s, then refuse anything big
+            return 502, b"Bad Gateway"
+        z = np.full((h, w), 1000.0, "<f4")
+        return 200, z.tobytes() + np.packbits(np.ones(w * h, np.uint8)).tobytes()
+
+    monkeypatch.setattr(terrain, "HTTP_FETCH", flaky)
+    ext = _merc_ext(-120.6, -119.9, 39.1, 39.7)
+    img, credit = terrain.terrain_image(ext, source="3dep", target_px=400)
+    assert calls == [400, 400, 400, 400, 200] and credit == terrain.CREDIT_3DEP
+    assert img.shape[1] == 200

@@ -97,6 +97,10 @@ def _cache_dir() -> Path:
     return d
 
 
+RETRIES = 4
+RETRY_WAIT = (2, 5, 10)            # seconds between attempts (USGS services have brief 502s)
+RETRY_STATUS = {429, 500, 502, 503, 504}
+
 HTTP_FETCH: Callable | None = None
 """Optional replacement transport: ``f(url, params, timeout) -> (status, bytes)``.
 The web app sets this to a browser request when the package runs in Pyodide."""
@@ -110,9 +114,15 @@ def _get(url, params=None, timeout=120, cache=True):
     if cache and f.exists():
         return f.read_bytes()
     if HTTP_FETCH is not None:
-        status, content = HTTP_FETCH(url, params, timeout)
-        if status in (403, 404):
-            return None
+        import time
+
+        for attempt in range(RETRIES):
+            status, content = HTTP_FETCH(url, params, timeout)
+            if status in (403, 404):
+                return None
+            if 200 <= status < 300 or status not in RETRY_STATUS or attempt == RETRIES - 1:
+                break
+            time.sleep(RETRY_WAIT[attempt])
         if not 200 <= status < 300:
             raise RuntimeError(f"HTTP {status} from {url}")
         if cache:
@@ -122,7 +132,7 @@ def _get(url, params=None, timeout=120, cache=True):
     import requests
 
     last = None
-    for attempt in range(3):
+    for attempt in range(RETRIES):
         try:
             r = requests.get(url, params=params, timeout=timeout, headers={"User-Agent": USER_AGENT})
             if r.status_code in (403, 404):
@@ -134,9 +144,9 @@ def _get(url, params=None, timeout=120, cache=True):
             return r.content
         except Exception as exc:  # noqa: BLE001 - retry any network error
             last = exc
-            if attempt < 2:
+            if attempt < RETRIES - 1:
                 import time
-                time.sleep(2 ** attempt)
+                time.sleep(RETRY_WAIT[attempt])
     raise last
 
 
@@ -512,7 +522,10 @@ def terrain_image(extent_merc, source="auto", target_px=None, style: HillshadeSt
         credits = []
         z = None
         if use_3dep:
-            z = fetch_3dep(extent_merc, width, height)
+            try:
+                z = fetch_3dep(extent_merc, width, height)
+            except Exception:  # a busy server sometimes refuses large exports: try half the size
+                z = fetch_3dep(extent_merc, max(2, width // 2), max(2, height // 2))
             credits.append(CREDIT_3DEP)
         if source == "copernicus" or (source == "auto" and (z is None or np.isnan(z).mean() > 0.02)):
             zc, res = fetch_copernicus(extent_merc, width, height,
