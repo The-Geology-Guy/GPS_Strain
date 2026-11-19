@@ -5,7 +5,7 @@ Examples::
     gps-strain P146 P149 P150                       # report only (NGL MIDAS, North-America fixed)
     gps-strain P146 P149 P150 -o tahoe              # writes tahoe_symbol.pdf and tahoe_strain.pdf
     gps-strain P146 P149 P150 -o tahoe --format png --basemap stadia-terrain-background
-    gps-strain --table my_stations.csv -o out --logo earthscope_logo.png
+    gps-strain --table my_stations.csv -o out --logo my_logo.png
     gps-strain --near 38.2 -122.3 --radius 30       # list stations near a point
     gps-strain --triangles RG24,P036,P039 P070,P039,RG24 -o raton   # several triangles on one map
 """
@@ -40,7 +40,7 @@ def main(argv=None):
                         "esri-shaded-relief, esri-physical, "
                         "opentopomap, synthetic (offline preview) or none")
     p.add_argument("--api-key", help="basemap API key (or set STADIA_API_KEY / ESRI_API_KEY)")
-    p.add_argument("--logo", help="logo image file or URL for the map sheets")
+    p.add_argument("--logo", help='logo image file or URL, or text (default: block letters "GPS STRAIN")')
     p.add_argument("--title", help="map title")
     p.add_argument("--triangles", nargs="+", metavar="A,B,C",
                    help="several triangles (comma-separated station IDs) for network maps")

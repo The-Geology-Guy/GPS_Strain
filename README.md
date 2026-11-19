@@ -40,8 +40,8 @@ gps-strain P146 P149 P150 -o tahoe
 # the original Stamen terrain-background look (needs a Stadia Maps key)
 gps-strain P146 P149 P150 -o tahoe --basemap stadia-terrain-background --api-key YOUR_KEY
 
-# add a logo (file or URL) to the sheets
-gps-strain P146 P149 P150 -o tahoe --logo earthscope_logo.png
+# the sheets carry a block-letter "GPS STRAIN" wordmark; swap in your own logo (file or URL)
+gps-strain P146 P149 P150 -o tahoe --logo my_logo.png
 
 # which stations are near a point?
 gps-strain --near 38.22 -122.31 --radius 30
@@ -66,7 +66,7 @@ sta = data.select_sites(midas, ["P146", "P149", "P150"])
 r = compute_strain(sta)                  # frame="enu" (default) or "utm"
 print(r.report())
 r.e1, r.e2, r.azimuth_s1, r.max_shear, r.rotation, r.sigma, r.mc
-plotting.symbol_map(r, sta, "symbol.pdf", logo="earthscope_logo.png")
+plotting.symbol_map(r, sta, "symbol.pdf")
 plotting.strain_map(r, sta, "strain.pdf", basemap="stadia-terrain-background")
 plotting.network_map([r1, r2, r3], [t1, t2, t3], "network.pdf", kind="ellipse")  # or kind="symbol"
 ```

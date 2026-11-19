@@ -9,7 +9,7 @@
   - `plotting.symbol_map`: landscape strain-symbol map;
   - `plotting.strain_map`: portrait velocity and strain-ellipse map with tables.
 
-  Basemaps come from web-map tiles (`basemap.py`): Esri World Terrain (default), Stadia/Stamen terrain-background (needs a key), and others, plus an offline synthetic preview. A logo slot takes any image file or URL.
+  Basemaps come from web-map tiles (`basemap.py`): Esri World Terrain (default), Stadia/Stamen terrain-background (needs a key), and others, plus an offline synthetic preview. The logo slot shows a block-letter "GPS STRAIN" wordmark by default (or any image file/URL).
 - **Done:** `plotting.network_map`: several triangles on one map (symbol or ellipse), like the 2021 Raton, NM figures, plus `gps-strain --triangles`.
 - **Done:** command-line tool `gps-strain`.
 - **Done:** the 2020 AC63 results table is reproduced to every printed digit in UTM mode. The 2020 strain algebra was right; its velocities were not.
@@ -28,7 +28,7 @@ Run `gps-strain P146 P149 P150 -o tahoe --format png` once on a normal connectio
 ## Next steps (package)
 
 1. Live smoke test of MIDAS, `.tenv3` and tiles. Add a real `midas.NA.txt` excerpt as a test fixture.
-2. Logo: get the official EarthScope logo (check EarthScope's usage terms) and pass it with `--logo`, or bundle it. The default data is NGL MIDAS, so match the logo to the data source.
+2. Logo: decided. No EarthScope logo; the sheets carry a block-letter "GPS STRAIN" wordmark (custom logos still possible with `--logo`).
 3. **Licence-free terrain basemap (recommended):** do what GEOSLAM does for its printed maps and draw the terrain from a DEM hillshade:
    - USGS 3DEP for the US, Copernicus GLO-30 on AWS globally, neither needing a key;
    - add a hypsometric tint and water to get the Stamen terrain-background look with no tile licence at all.

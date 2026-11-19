@@ -303,11 +303,24 @@ def _load_logo(logo):
     return plt.imread(Path(s))
 
 
-def draw_logo(ax, logo):
+WORDMARK = "GPS STRAIN"
+BLOCK = ["Arial Black", "Helvetica Neue", "Arial", "Liberation Sans", "DejaVu Sans"]
+
+
+def draw_logo(ax, logo=None):
+    """Logo slot: an image file/URL, or by default the block-letter "GPS STRAIN" wordmark.
+
+    Pass ``logo=False`` to leave the slot empty.
+    """
     ax.axis("off")
-    img = _load_logo(logo)
-    if img is not None:
-        ax.imshow(img, aspect="equal")
+    if logo is False:
+        return
+    if logo is None or (isinstance(logo, str) and not logo.lower().endswith(
+            (".png", ".jpg", ".jpeg", ".gif", ".tif", ".tiff", ".webp")) and "://" not in logo):
+        ax.text(0.5, 0.5, WORDMARK if logo is None else logo, transform=ax.transAxes, ha="center",
+                va="center", fontsize=40, fontweight="black", fontfamily=BLOCK, color="#9e2a2b")
+        return
+    ax.imshow(_load_logo(logo), aspect="equal")
 
 
 # ---------------------------------------------------------------------------
