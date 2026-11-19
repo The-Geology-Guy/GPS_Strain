@@ -335,13 +335,14 @@ def _window_range(z, size=5):
 
 
 def _window_max(mask: np.ndarray, size: int) -> np.ndarray:
-    """Boolean max filter (dilation) over a size x size window."""
-    from numpy.lib.stride_tricks import sliding_window_view
-
+    """Boolean max filter (dilation) over a size x size window, via a
+    summed-area table (linear time, whatever the window size)."""
     p = size // 2
-    m = np.pad(mask.astype(np.uint8), p, mode="edge")
-    m = sliding_window_view(m, size, axis=1).max(-1)
-    return sliding_window_view(m, size, axis=0).max(-1).astype(bool)
+    m = np.pad(mask.astype(np.int32), p, mode="edge")
+    c = np.zeros((m.shape[0] + 1, m.shape[1] + 1), np.int64)
+    c[1:, 1:] = m.cumsum(0).cumsum(1)
+    s = c[size:, size:] - c[:-size, size:] - c[size:, :-size] + c[:-size, :-size]
+    return s > 0
 
 
 def water_mask(z: np.ndarray, flat_m: float = 0.01, close_px: int = 13) -> np.ndarray:

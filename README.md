@@ -47,6 +47,10 @@ gps-strain P146 P149 P150 -o tahoe --logo my_logo.png
 # the scale bar and north arrow (easier to read over dark relief)
 gps-strain P146 P149 P150 -o tahoe --visibility
 
+# mapped Quaternary faults (USGS; GEM outside the US) are drawn by default, between the
+# terrain and the strain symbols; leave them off with --no-faults
+gps-strain P146 P149 P150 -o tahoe --no-faults
+
 # which stations are near a point?
 gps-strain --near 38.22 -122.31 --radius 30
 
@@ -106,6 +110,7 @@ pytest
 ## Data and credits
 
 - **Method:** Cronin, V. S., & Resor, P. G. (2021), *Algorithm for triangle strain*; Cronin (2021), *Primer on infinitesimal strain analysis*.
+- **Faults:** USGS Quaternary Fault and Fold Database (public domain); outside the US, GEM Global Active Faults Database (Styron & Pagani 2020, CC BY-SA 4.0).
 - **Default velocities:** Nevada Geodetic Laboratory MIDAS. Please cite Blewitt, Hammond & Kreemer (2018), *Eos* 99, doi:10.1029/2018EO104623, and Blewitt et al. (2016), *JGR* 121, doi:10.1002/2015JB012552.
 - **Python package:** Luke Pajer ([ORCID 0000-0002-5218-7650](https://orcid.org/0000-0002-5218-7650)).
 

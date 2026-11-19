@@ -34,6 +34,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import FancyBboxPatch, Polygon, Rectangle
 
 from . import basemap as bm
+from . import faults as qf
 from . import terrain
 from .strain import NANO, StrainResult
 
@@ -90,6 +91,8 @@ def map_style(visibility=False) -> MapStyle:
     return HIGH_VISIBILITY if visibility else CLASSIC
 
 DEFAULT_BASEMAP = "hillshade"
+FAULT_COLOR = "#e6d43a"   # GEOSLAM / Cronin report figures: yellow fault traces
+FAULT_ZORDER = 10         # above the terrain and grid, below every map symbol
 HILLSHADE_SOURCES = {"hillshade": "auto", "hillshade-3dep": "3dep", "hillshade-copernicus": "copernicus"}
 BASEMAPS = [*HILLSHADE_SOURCES, *bm.PROVIDERS, "synthetic", "none"]
 
@@ -275,14 +278,67 @@ def draw_basemap(ax, ext, basemap=DEFAULT_BASEMAP, tile_source=None, zoom=None, 
     return credit
 
 
+def draw_faults(ax, ext, faults=True, source="auto", style=CLASSIC):
+    """Draw fault traces over the terrain (zorder :data:`FAULT_ZORDER`).
+
+    Returns the credit line, or None. Records the legend label on the axes
+    (``ax.gps_strain_fault_label``) so the station legend can show it.
+    """
+    ax.gps_strain_fault_label = None
+    if faults is None or faults is False:
+        return None
+    credit = None
+    if faults is True:
+        lon0, lat0 = bm.merc_to_lonlat(ext[0], ext[2])
+        lon1, lat1 = bm.merc_to_lonlat(ext[1], ext[3])
+        try:
+            faults, credit = qf.faults_in_box(float(lon0), float(lat0), float(lon1), float(lat1), source)
+        except Exception as exc:  # network down etc.: the map is still drawn
+            return f"Faults unavailable ({type(exc).__name__}: {exc})"[:160]
+    lw = 2.2 if style.edge else 1.5
+    edge = outline(lw, 0.9, "k") if style.edge else None
+    n = 0
+    for f in faults:
+        for line in f["lines"]:
+            fx, fy = bm.lonlat_to_merc(line[:, 0], line[:, 1])
+            ax.plot(fx, fy, color=FAULT_COLOR, lw=lw, alpha=0.95, zorder=FAULT_ZORDER,
+                    solid_capstyle="round", path_effects=edge)
+            n += 1
+    if n:
+        ax.gps_strain_fault_label = ("Quaternary fault" if credit in (None, qf.CREDIT_USGS)
+                                     else "Active fault")
+    ax.set_xlim(ext[0], ext[1])
+    ax.set_ylim(ext[2], ext[3])
+    return credit
+
+
+def _faults_for(basemap, faults):
+    """No fetched faults on the made-up offline terrain."""
+    return False if (basemap == "synthetic" and faults is True) else faults
+
+
+def _fault_handle(ax, style=CLASSIC):
+    label = getattr(ax, "gps_strain_fault_label", None)
+    if not label:
+        return []
+    return [Line2D([0], [0], color=FAULT_COLOR, lw=3, label=label,
+                   path_effects=outline(3, 0.9, "k") if style.edge else None)]
+
+
 def setup_map(ax, table, bounds=0.5, basemap=DEFAULT_BASEMAP, tile_source=None, zoom=None,
-              attribution=True, dem_source=None, terrain_style=None, max_width=None, style=CLASSIC):
+              attribution=True, dem_source=None, terrain_style=None, max_width=None, style=CLASSIC,
+              faults=False, fault_source="auto"):
     """Prepare a Web Mercator map axes with basemap and labelled lon/lat graticule.
 
     ``max_width`` (Web Mercator metres) zooms the map in to at most that width,
     centred on the stations, but never so far that the stations lose a margin
     of :data:`STATION_PAD` of the map on each side (more at the top, under the
     station legend).
+
+    ``faults``: True fetches mapped faults for the map area (see
+    :func:`gps_strain.faults.faults_in_box`, ``fault_source``); a list of
+    fault dicts draws those; False draws none. Faults sit above the terrain
+    and below everything else.
     """
     lon0, lon1, lat0, lat1 = map_extent(table, bounds)
     x0, y0 = bm.lonlat_to_merc(lon0, lat0)
@@ -309,6 +365,9 @@ def setup_map(ax, table, bounds=0.5, basemap=DEFAULT_BASEMAP, tile_source=None, 
     ax.set_ylim(ext[2], ext[3])
     ax.set_aspect("equal", adjustable="box")
     credit = draw_basemap(ax, ext, basemap, tile_source, zoom, dem_source, terrain_style)
+    fault_credit = draw_faults(ax, ext, faults, fault_source, style)
+    if fault_credit:
+        credit = f"{credit}\n{fault_credit}" if credit else fault_credit
 
     # graticule labelled on all four sides
     glon0, glat0 = bm.merc_to_lonlat(ext[0], ext[2])
@@ -445,6 +504,7 @@ def draw_triangle_and_sites(ax, table, colors=SITE_COLORS, legend_loc="upper cen
                 mew=1.5 if style.edge else 0, zorder=50)
         handles.append(Line2D([0], [0], marker="o", color="b", ls="--", markerfacecolor=c,
                               markeredgewidth=0, markersize=15, label=site))
+    handles += _fault_handle(ax, style)
     leg = ax.legend(handles=handles, ncol=len(handles), loc=legend_loc,
                     prop={"family": SERIF, "size": 15})
     leg.get_frame().set_edgecolor("k")
@@ -656,11 +716,16 @@ def _default_title(data_label, one_line):
 def symbol_map(result: StrainResult, table, path=None, title=None, data_label="NGL MIDAS",
                logo=None, basemap=DEFAULT_BASEMAP, tile_source=None, dem_source=None, bounds=0.5,
                scale_km=None, min_strain=0.1, max_strain=300.0, zoom=None, terrain_style=None,
-               fit_symbol=True, visibility=False):
+               fit_symbol=True, visibility=False, faults=True, fault_source="auto"):
     """Landscape strain-rate symbol map (the 2020 ``symbol_map_full`` layout).
 
     ``visibility=True`` ("Increase visibility") draws the overlays thicker
     with white edges; see :data:`HIGH_VISIBILITY`.
+
+    ``faults=True`` draws mapped Quaternary faults (USGS; GEM outside the US)
+    between the terrain and the map symbols; ``faults=False`` leaves them off.
+    With ``basemap="synthetic"`` they are off unless a list is given (real
+    faults over made-up terrain would mislead).
 
     With ``fit_symbol`` (default) the map zooms in, if needed, so the symbol
     at the centroid stays inside the triangle; the symbol keeps its size on
@@ -674,7 +739,8 @@ def symbol_map(result: StrainResult, table, path=None, title=None, data_label="N
         ax = fig.add_subplot(gs[:, 11:])
         fit = symbol_fit_width(result, table, min_strain, max_strain) if fit_symbol else None
         setup_map(ax, table, bounds, basemap, tile_source, zoom, dem_source=dem_source,
-                  terrain_style=terrain_style, max_width=fit, style=style)
+                  terrain_style=terrain_style, max_width=fit, style=style,
+                  faults=_faults_for(basemap, faults), fault_source=fault_source)
         x, y = draw_triangle_and_sites(ax, table, style=style)
         width = ax.get_xlim()[1] - ax.get_xlim()[0]
         size = SYMBOL_FRAC * (min(width, fit) if fit else width)
@@ -706,11 +772,17 @@ def symbol_map(result: StrainResult, table, path=None, title=None, data_label="N
 def strain_map(result: StrainResult, table, path=None, title=None, data_label="NGL MIDAS",
                velocity_label="Velocity Relative to North America", logo=None, basemap=DEFAULT_BASEMAP,
                tile_source=None, dem_source=None, bounds=0.5, scale_km=None, ref_velocity=None,
-               zoom=None, terrain_style=None, fit_ellipse=True, visibility=False):
+               zoom=None, terrain_style=None, fit_ellipse=True, visibility=False, faults=True,
+               fault_source="auto"):
     """Portrait strain-ellipse map with velocities (the 2020 ``strain_map_full`` layout).
 
     ``visibility=True`` ("Increase visibility") draws the overlays thicker
     with white edges; see :data:`HIGH_VISIBILITY`.
+
+    ``faults=True`` draws mapped Quaternary faults (USGS; GEM outside the US)
+    between the terrain and the map symbols; ``faults=False`` leaves them off.
+    With ``basemap="synthetic"`` they are off unless a list is given (real
+    faults over made-up terrain would mislead).
 
     With ``fit_ellipse`` (default) the map zooms in, if needed, so the strain
     ellipse at the centroid stays inside the triangle, as on the 2020 maps;
@@ -724,7 +796,8 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
         ax = fig.add_subplot(gs[:30, :])
         fit = ellipse_fit_width(result, table) if fit_ellipse else None
         setup_map(ax, table, bounds, basemap, tile_source, zoom, dem_source=dem_source,
-                  terrain_style=terrain_style, max_width=fit, style=style)
+                  terrain_style=terrain_style, max_width=fit, style=style,
+                  faults=_faults_for(basemap, faults), fault_source=fault_source)
         x, y = draw_triangle_and_sites(ax, table, style=style)
         mx0, mx1 = ax.get_xlim()
         width = mx1 - mx0
@@ -825,7 +898,8 @@ def _stations_union(tables):
 def network_map(results, tables, path=None, kind="symbol", basemap=DEFAULT_BASEMAP,
                 tile_source=None, dem_source=None, bounds=0.5, scale_km=None, tri_colors=None, lines=None,
                 velocities=True, min_strain=0.1, max_strain=None, zoom=None, title=None,
-                figsize=(15, 15), terrain_style=None, fit=True, visibility=False):
+                figsize=(15, 15), terrain_style=None, fit=True, visibility=False, faults=True,
+                fault_source="auto"):
     """Several triangles on one map, like the 2021 Raton, NM figures.
 
     ``kind="symbol"`` draws each triangle's strain-rate symbol at its centroid;
@@ -846,7 +920,8 @@ def network_map(results, tables, path=None, kind="symbol", basemap=DEFAULT_BASEM
         fig = plt.figure(figsize=figsize)
         ax = fig.add_axes([0.05, 0.04, 0.78, 0.9])
         setup_map(ax, stations, bounds, basemap, tile_source, zoom, dem_source=dem_source,
-                  terrain_style=terrain_style, style=style)
+                  terrain_style=terrain_style, style=style, faults=_faults_for(basemap, faults),
+                  fault_source=fault_source)
         width = ax.get_xlim()[1] - ax.get_xlim()[0]
         sx, sy = bm.lonlat_to_merc(stations["lon"].to_numpy(float), stations["lat"].to_numpy(float))
         if velocities:
@@ -891,6 +966,7 @@ def network_map(results, tables, path=None, kind="symbol", basemap=DEFAULT_BASEM
                     size = min(size, symbol_max_size(r, x, y, min_strain, mmax) or size)
                 draw_strain_symbol(ax, r, cen, size, min_strain, mmax)
             handles.append(Line2D([0], [0], color=c, ls="--", lw=2, label="–".join(r.sites)))
+        handles += _fault_handle(ax, style)
         leg = ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.01, 1.0),
                         prop={"family": SERIF, "size": 10}, title="Triangles", framealpha=0.9)
         leg.set_zorder(70)

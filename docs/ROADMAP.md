@@ -35,7 +35,7 @@ Run on a normal connection on 18 Nov 2026 (`gps-strain P146 P149 P150 -o tahoe`,
    - compute strain, interpret it, and present tectonics, hazard, risk and mitigation in a 5–7 minute talk.
 
    To add:
-   - a Qfaults overlay on both maps (reuse GEOSLAM's `sources/faults.py`, the USGS Qfaults REST service, no key);
+   - Done (18 Nov 2026): Quaternary fault overlay on all maps (`faults.py`, ported from GEOSLAM; USGS, GEM outside the US), drawn between the terrain and the map symbols;
    - a "suggest triangles" helper that searches MIDAS stations near a point for valid triangles;
    - a slide-ready export (PNG at 16:9).
 

@@ -43,6 +43,10 @@ def main(argv=None):
     p.add_argument("--visibility", action="store_true",
                    help="increase visibility: thicker lines and arrows with white edges, white panels "
                         "behind the scale bar and north arrow (easier to read over dark relief)")
+    p.add_argument("--no-faults", action="store_true",
+                   help="leave off the mapped Quaternary faults (USGS; GEM outside the US)")
+    p.add_argument("--fault-source", default="auto", choices=["auto", "usgs", "gem"],
+                   help="fault database (default: USGS, then GEM where USGS has none)")
     p.add_argument("--logo", help='logo image file or URL, or text (default: block letters "GPS STRAIN")')
     p.add_argument("--title", help="map title")
     p.add_argument("--triangles", nargs="+", metavar="A,B,C",
@@ -59,7 +63,8 @@ def main(argv=None):
             for kind in ("symbol", "ellipse"):
                 out = f"{a.output}_network_{kind}.{a.format}"
                 plotting.network_map(results, tables, out, kind=kind, basemap=a.basemap, title=a.title,
-                                     visibility=a.visibility)
+                                     visibility=a.visibility, faults=not a.no_faults,
+                                     fault_source=a.fault_source)
                 print(f"Wrote {out}")
         return 0
 
@@ -84,7 +89,8 @@ def main(argv=None):
     result = compute_strain(table, frame=a.frame)
     print(result.report())
     if a.output:
-        kw = dict(title=a.title, data_label=label, logo=a.logo, basemap=a.basemap, visibility=a.visibility)
+        kw = dict(title=a.title, data_label=label, logo=a.logo, basemap=a.basemap, visibility=a.visibility,
+                  faults=not a.no_faults, fault_source=a.fault_source)
         if a.map in ("both", "symbol"):
             out = f"{a.output}_symbol.{a.format}"
             plotting.symbol_map(result, table, out, **kw)

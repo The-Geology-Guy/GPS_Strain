@@ -195,7 +195,7 @@ def test_map_survives_terrain_failure(tmp_path):
     def offline(ext, w, h):
         raise ConnectionError("no network")
 
-    fig = plotting.symbol_map(r, t, tmp_path / "s.png", dem_source=offline)
+    fig = plotting.symbol_map(r, t, tmp_path / "s.png", dem_source=offline, faults=False)
     texts = [x.get_text() for x in fig.axes[0].texts]
     assert any("Basemap unavailable" in s for s in texts)
     with pytest.raises(ValueError, match="unknown basemap"):
@@ -230,11 +230,11 @@ def test_strain_ellipse_fits_inside_triangle(stations):
 
     t = from_records(stations)
     r = compute_strain(t, mc_samples=0)
-    fig = plotting.strain_map(r, t, None, basemap="none")
+    fig = plotting.strain_map(r, t, None, basemap="none", faults=False)
     ax = fig.axes[0]
     width = ax.get_xlim()[1] - ax.get_xlim()[0]
     fit = plotting.ellipse_fit_width(r, t)
-    default = plotting.strain_map(r, t, None, basemap="none", fit_ellipse=False).axes[0]
+    default = plotting.strain_map(r, t, None, basemap="none", fit_ellipse=False, faults=False).axes[0]
     assert width < default.get_xlim()[1] - default.get_xlim()[0]   # zoomed in ...
     assert fit * (1 - 1e-9) <= width <= fit * 1.1                  # ... to the fit (or the station margin)
     R = plotting.ELLIPSE_FRAC * min(width, fit)                    # 11% of the map when it can be
@@ -263,7 +263,7 @@ def test_skinny_triangle_shrinks_glyph_instead_of_hiding_stations():
     t = from_records(skinny)
     r = compute_strain(t, mc_samples=0)
     fit = plotting.ellipse_fit_width(r, t)
-    ax = plotting.strain_map(r, t, None, basemap="none").axes[0]
+    ax = plotting.strain_map(r, t, None, basemap="none", faults=False).axes[0]
     width = ax.get_xlim()[1] - ax.get_xlim()[0]
     assert width > fit                       # stations' margin wins over the zoom
     tx, _ = bm.lonlat_to_merc(t["lon"].to_numpy(float), t["lat"].to_numpy(float))
@@ -279,7 +279,7 @@ def test_wordmark_right_edge_on_map_axis():
 
     t = from_records(TAHOE)
     r = compute_strain(t, mc_samples=0)
-    fig = plotting.strain_map(r, t, None, basemap="none")
+    fig = plotting.strain_map(r, t, None, basemap="none", faults=False)
     fig.canvas.draw()
     ax = fig.axes[0]
     mark = next(x for a in fig.axes for x in a.texts if x.get_text() == plotting.WORDMARK)
@@ -299,7 +299,7 @@ def test_network_ellipses_shrink_to_fit_their_own_triangles():
     small = from_records([TAHOE[0], TAHOE[1],                     # a smaller triangle inside the map
                           dict(TAHOE[2], site="P999", lat=39.40, lon=-120.25)])
     rs = [compute_strain(t, mc_samples=0) for t in (big, small)]
-    fig = plotting.network_map(rs, [big, small], None, kind="ellipse", basemap="none")
+    fig = plotting.network_map(rs, [big, small], None, kind="ellipse", basemap="none", faults=False)
     ax = fig.axes[0]
     outlines = [ln for ln in ax.lines if ln.get_zorder() == 34]
     assert len(outlines) == 2
@@ -326,7 +326,7 @@ def test_portrait_box_row_layout():
 
     t = from_records(ALASKA)
     r = compute_strain(t, mc_samples=0)
-    fig = plotting.strain_map(r, t, None, basemap="none")
+    fig = plotting.strain_map(r, t, None, basemap="none", faults=False)
     fig.canvas.draw()
     rend = fig.canvas.get_renderer()
     tables = [c for a in fig.axes for c in a.get_children() if isinstance(c, Table)]
@@ -359,7 +359,7 @@ def test_visibility_toggle(vis, tmp_path):
 
     t = from_records(TAHOE)
     r = compute_strain(t, mc_samples=0)
-    fig = plotting.strain_map(r, t, tmp_path / "m.png", basemap="none", visibility=vis)
+    fig = plotting.strain_map(r, t, tmp_path / "m.png", basemap="none", visibility=vis, faults=False)
     ax = fig.axes[0]
     blue = [ln for ln in ax.lines if ln.get_color() == "blue"]
     white_under = [ln for ln in ax.lines if ln.get_color() == "w" and ln.get_zorder() == 19]
@@ -368,6 +368,90 @@ def test_visibility_toggle(vis, tmp_path):
     assert blue[0].get_linewidth() == style.triangle_lw
     assert bool(white_under) == vis and bool(panels) == vis
     assert ax.collections[0].get_path_effects() if vis else not ax.collections[0].get_path_effects()
-    plotting.symbol_map(r, t, tmp_path / "s.png", basemap="none", visibility=vis)
-    plotting.network_map([r], [t], tmp_path / "n.png", kind="ellipse", basemap="none", visibility=vis)
+    plotting.symbol_map(r, t, tmp_path / "s.png", basemap="none", visibility=vis, faults=False)
+    plotting.network_map([r], [t], tmp_path / "n.png", kind="ellipse", basemap="none", visibility=vis, faults=False)
+    plt.close("all")
+
+
+# --- Quaternary faults ---------------------------------------------------------------
+QFAULT_PAGE = {"type": "FeatureCollection", "features": [
+    {"type": "Feature", "properties": {"fault_name": "Mohawk Valley fault zone", "age": "<15,000"},
+     "geometry": {"type": "LineString", "coordinates": [[-120.45, 39.30], [-120.30, 39.45], [-120.20, 39.55]]}},
+    {"type": "Feature", "properties": {"fault_name": "North Tahoe fault", "age": "<130,000"},
+     "geometry": {"type": "MultiLineString", "coordinates": [[[-120.15, 39.25], [-120.05, 39.35]],
+                                                             [[-120.05, 39.35], [-120.00, 39.40]]]}},
+    {"type": "Feature", "properties": {}, "geometry": None},
+]}
+
+
+def test_parse_qfaults_geojson():
+    from gps_strain import faults
+
+    fs = faults.parse_geojson(QFAULT_PAGE)
+    assert [f["properties"]["fault_name"] for f in fs] == ["Mohawk Valley fault zone", "North Tahoe fault"]
+    assert [len(f["lines"]) for f in fs] == [1, 2]
+    assert fs[0]["lines"][0].shape == (3, 2)
+
+
+def test_usgs_qfaults_pages_through_results(monkeypatch):
+    import json
+
+    from gps_strain import faults
+
+    calls = []
+
+    def fake_get(url, params=None, timeout=0, cache=True):
+        calls.append(params["resultOffset"])
+        if params["resultOffset"] == 0:
+            return json.dumps(dict(QFAULT_PAGE, exceededTransferLimit=True)).encode()
+        return json.dumps({"type": "FeatureCollection", "features": [QFAULT_PAGE["features"][0]]}).encode()
+
+    monkeypatch.setattr(faults, "_get", fake_get)
+    fs = faults.usgs_qfaults(-121, 39, -119.5, 40, page=3)
+    assert calls == [0, 3] and len(fs) == 3
+    out, credit = faults.faults_in_box(-121, 39, -119.5, 40)
+    assert credit == faults.CREDIT_USGS and len(out) == 3
+
+
+def test_faults_sit_between_terrain_and_symbols():
+    import matplotlib.pyplot as plt
+
+    from gps_strain import compute_strain, faults, plotting
+    from gps_strain.data import from_records
+
+    fs = faults.parse_geojson(QFAULT_PAGE)
+    t = from_records(TAHOE)
+    r = compute_strain(t, mc_samples=0)
+    for vis in (False, True):
+        fig = plotting.strain_map(r, t, None, dem_source=lambda e, w, h: _plane(e, w, h, 0.05, 0.02),
+                                  faults=fs, visibility=vis)
+        ax = fig.axes[0]
+        fault_lines = [ln for ln in ax.lines if ln.get_color() == plotting.FAULT_COLOR]
+        assert len(fault_lines) == 3
+        terrain_z = max(im.get_zorder() for im in ax.images)
+        symbols_z = min(a.get_zorder() for a in ax.lines + ax.collections + ax.patches
+                        if a not in fault_lines)
+        assert terrain_z < plotting.FAULT_ZORDER < symbols_z
+        labels = [tx.get_text() for tx in ax.get_legend().get_texts()]
+        assert "Quaternary fault" in labels
+    # fetched faults are not drawn on the made-up offline terrain
+    fig = plotting.strain_map(r, t, None, basemap="synthetic")
+    assert not [ln for ln in fig.axes[0].lines if ln.get_color() == plotting.FAULT_COLOR]
+    plt.close("all")
+
+
+def test_map_survives_fault_service_failure(monkeypatch):
+    import matplotlib.pyplot as plt
+
+    from gps_strain import compute_strain, faults, plotting
+    from gps_strain.data import from_records
+
+    def down(*a, **k):
+        raise ConnectionError("no network")
+
+    monkeypatch.setattr(faults, "faults_in_box", down)
+    t = from_records(TAHOE)
+    r = compute_strain(t, mc_samples=0)
+    fig = plotting.strain_map(r, t, None, basemap="none")
+    assert any("Faults unavailable" in x.get_text() for x in fig.axes[0].texts)
     plt.close("all")
