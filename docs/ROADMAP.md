@@ -1,6 +1,6 @@
 # Roadmap: from Python package to Mac/PC app and gps-strain.org
 
-## Where things stand (v2.0.0.dev0, branch `v2-rebuild`)
+## Where things stand (v2.0.0.dev0, on `main`)
 
 - **Done:** strain solver for 3+ stations: weighted least squares, full covariance, Monte Carlo uncertainties on derived quantities.
 - **Done:** classic UTM mode (matches Cronin's spreadsheet) and a local-ENU default with velocity rotation.
@@ -9,32 +9,29 @@
   - `plotting.symbol_map`: landscape strain-symbol map;
   - `plotting.strain_map`: portrait velocity and strain-ellipse map with tables.
 
-  Basemaps come from web-map tiles (`basemap.py`): Esri World Terrain (default), Stadia/Stamen terrain-background (needs a key), and others, plus an offline synthetic preview. The logo slot shows a block-letter "GPS STRAIN" wordmark by default (or any image file/URL).
+  The default background is GEOSLAM's grey hillshade, computed from a DEM (`terrain.py`): USGS 3DEP in the US, Copernicus GLO-30/90 elsewhere, no key and no tile licence. USGS The National Map tiles are optional (`basemap.py`). Esri and Stadia were dropped (unclear print and commercial terms, and no longer needed). The logo slot shows a block-letter "GPS STRAIN" wordmark by default (or any image file/URL).
 - **Done:** `plotting.network_map`: several triangles on one map (symbol or ellipse), like the 2021 Raton, NM figures, plus `gps-strain --triangles`.
 - **Done:** command-line tool `gps-strain`.
 - **Done:** the 2020 AC63 results table is reproduced to every printed digit in UTM mode. The 2020 strain algebra was right; its velocities were not.
-- **Done:** 23 tests, including exact reproduction of Cronin & Resor's worked example, a rigid-plate null test and an offline map-render test.
+- **Done:** 36 tests, including exact reproduction of Cronin & Resor's worked example, a rigid-plate null test, offline map renders and the terrain pipeline (3DEP and Copernicus response formats, hillshade geometry, water mask).
 
 ### Not yet verified live
 
-The build sandbox had no network access to NGL, Esri or Stadia. Untested against real servers:
+The build sandbox has no network access to NGL, USGS or AWS. Untested against real servers:
 
 - the MIDAS download (`data.load_midas`);
 - the `.tenv3` loader;
-- tile fetching, including the Esri `?token=` key format.
+- the 3DEP and Copernicus downloads (`terrain.py`; the request and file formats are tested offline);
+- USGS tile fetching.
 
-Run `gps-strain P146 P149 P150 -o tahoe --format png` once on a normal connection, then regenerate `examples/AC63_*.png` with real tiles.
+Run `gps-strain P146 P149 P150 -o tahoe --format png` once on a normal connection, then regenerate `examples/AC63_*.png` and the Raton maps with real terrain.
 
 ## Next steps (package)
 
-1. Live smoke test of MIDAS, `.tenv3` and tiles. Add a real `midas.NA.txt` excerpt as a test fixture.
+1. Live smoke test of MIDAS, `.tenv3`, 3DEP, Copernicus and USGS tiles. Add a real `midas.NA.txt` excerpt as a test fixture.
 2. Logo: decided. No EarthScope logo; the sheets carry a block-letter "GPS STRAIN" wordmark (custom logos still possible with `--logo`).
-3. **Licence-free terrain basemap (recommended):** do what GEOSLAM does for its printed maps and draw the terrain from a DEM hillshade:
-   - USGS 3DEP for the US, Copernicus GLO-30 on AWS globally, neither needing a key;
-   - add a hypsometric tint and water to get the Stamen terrain-background look with no tile licence at all.
-
-   `usgs-relief` / `usgs-topo` tiles (public domain, US only) are already available as basemaps.
-4. Basemap licence decision (see `docs/research/04_costs.md`): Esri Location Platform key (free at this scale; terms silent on printing), or a Stadia paid plan for the exact Stamen look (print rights only clearly cover its static-map product, so email Stadia first).
+3. Done: grey DEM hillshade as the default printed-map terrain (decided 18 Nov 2026). An optional colour tint only if wanted later.
+4. Basemap licences: settled. The hillshade needs none; Esri and Stadia were removed. `docs/research/04_costs.md` is kept for the record.
 5. **GETSI Unit 6 (final project) support.** Unit 6 asks students to choose three adjacent NOTA stations in an actively straining area near people or infrastructure:
    - all interior angles above ~30° and no side over 100 km (both now checked and warned about);
    - map active faults from the USGS Quaternary Fault and Fold Database;
@@ -56,8 +53,8 @@ Run `gps-strain P146 P149 P150 -o tahoe --format png` once on a normal connectio
 Built to match **geoslam.org**: the same Windows-98 toolkit, desktop and mobile layouts, and Cronin reviewing the site before it is indexed. The solver is small enough to port to JavaScript or to run with Pyodide.
 
 - **Data:** mirror `midas.NA.txt` to JSON on the same domain with a scheduled job, since NGL may not allow direct browser requests.
-- **Basemap:** use whatever geoslam.org uses, subject to the licensing above.
-- **Printing:** render the two sheets server-side with this package, or draw them in the browser.
+- **Basemap:** the same as geoslam.org: USGS The National Map tiles (topo default, shaded relief, imagery) plus OpenStreetMap, in MapLibre.
+- **Printing:** like geoslam.org, run this package in the browser (Pyodide, matplotlib loaded on first use) and draw the two sheets there, with the grey hillshade from 3DEP fetched by the browser.
 
 ## Desktop app
 

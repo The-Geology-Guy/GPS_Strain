@@ -4,7 +4,7 @@ Examples::
 
     gps-strain P146 P149 P150                       # report only (NGL MIDAS, North-America fixed)
     gps-strain P146 P149 P150 -o tahoe              # writes tahoe_symbol.pdf and tahoe_strain.pdf
-    gps-strain P146 P149 P150 -o tahoe --format png --basemap stadia-terrain-background
+    gps-strain P146 P149 P150 -o tahoe --format png --basemap usgs-topo
     gps-strain --table my_stations.csv -o out --logo my_logo.png
     gps-strain --near 38.2 -122.3 --radius 30       # list stations near a point
     gps-strain --triangles RG24,P036,P039 P070,P039,RG24 -o raton   # several triangles on one map
@@ -35,11 +35,10 @@ def main(argv=None):
     p.add_argument("-o", "--output", help="output name prefix for the maps")
     p.add_argument("--format", default="pdf", choices=["pdf", "png", "svg"])
     p.add_argument("--map", default="both", choices=["both", "symbol", "strain"])
-    p.add_argument("--basemap", default="esri-terrain",
-                   help="esri-terrain, stadia-terrain-background, usgs-relief, usgs-topo, usgs-imagery, "
-                        "esri-shaded-relief, esri-physical, "
-                        "opentopomap, synthetic (offline preview) or none")
-    p.add_argument("--api-key", help="basemap API key (or set STADIA_API_KEY / ESRI_API_KEY)")
+    p.add_argument("--basemap", default=plotting.DEFAULT_BASEMAP, choices=plotting.BASEMAPS,
+                   help="hillshade (default: grey shaded relief from USGS 3DEP in the US, Copernicus "
+                        "elsewhere; no key), hillshade-3dep, hillshade-copernicus, USGS tiles "
+                        "(usgs-relief, usgs-topo, usgs-imagery; US only), synthetic (offline preview) or none")
     p.add_argument("--logo", help='logo image file or URL, or text (default: block letters "GPS STRAIN")')
     p.add_argument("--title", help="map title")
     p.add_argument("--triangles", nargs="+", metavar="A,B,C",
@@ -55,8 +54,7 @@ def main(argv=None):
         if a.output:
             for kind in ("symbol", "ellipse"):
                 out = f"{a.output}_network_{kind}.{a.format}"
-                plotting.network_map(results, tables, out, kind=kind, basemap=a.basemap,
-                                     api_key=a.api_key, title=a.title)
+                plotting.network_map(results, tables, out, kind=kind, basemap=a.basemap, title=a.title)
                 print(f"Wrote {out}")
         return 0
 
@@ -81,7 +79,7 @@ def main(argv=None):
     result = compute_strain(table, frame=a.frame)
     print(result.report())
     if a.output:
-        kw = dict(title=a.title, data_label=label, logo=a.logo, basemap=a.basemap, api_key=a.api_key)
+        kw = dict(title=a.title, data_label=label, logo=a.logo, basemap=a.basemap)
         if a.map in ("both", "symbol"):
             out = f"{a.output}_symbol.{a.format}"
             plotting.symbol_map(result, table, out, **kw)

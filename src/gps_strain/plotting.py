@@ -9,8 +9,10 @@ Two layouts, matching the 2020 package:
   the strain ellipse at the centroid; below it the title, logo, ellipse legend,
   velocity key, speed table and station table.
 
-Basemaps come from :mod:`gps_strain.basemap` (Web Mercator tiles, no cartopy).
-Map axes use Web Mercator metres as data coordinates. Web Mercator is
+The default background is a grey hillshade drawn from a DEM
+(:mod:`gps_strain.terrain`), like GEOSLAM's printed maps; USGS tiles are an
+option (:mod:`gps_strain.basemap`). No cartopy. Map axes use Web Mercator
+metres as data coordinates. Web Mercator is
 conformal, so arrow and strain-axis azimuths are drawn correctly.
 
 Symbol conventions (Cronin & Resor / GETSI): black arrows pointing inward =
@@ -21,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import math
+import textwrap
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -30,6 +33,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import FancyBboxPatch, Polygon
 
 from . import basemap as bm
+from . import terrain
 from .strain import NANO, StrainResult
 
 S1_COLOR = "tomato"
@@ -39,6 +43,10 @@ SERIF = ["Georgia", "Gelasio", "DejaVu Serif"]
 SANS = ["Arial", "Liberation Sans", "Helvetica", "DejaVu Sans"]
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 HALO = [patheffects.withStroke(linewidth=4, foreground="w")]
+
+DEFAULT_BASEMAP = "hillshade"
+HILLSHADE_SOURCES = {"hillshade": "auto", "hillshade-3dep": "3dep", "hillshade-copernicus": "copernicus"}
+BASEMAPS = [*HILLSHADE_SOURCES, *bm.PROVIDERS, "synthetic", "none"]
 
 
 # ---------------------------------------------------------------------------
@@ -172,8 +180,48 @@ def map_extent(table, bounds=0.5):
     return lon.min() - bounds, lon.max() + bounds, lat.min() - bounds, lat.max() + bounds
 
 
-def setup_map(ax, table, bounds=0.5, basemap="esri-terrain", api_key=None, tile_source=None,
-              zoom=None, attribution=True):
+def draw_basemap(ax, ext, basemap=DEFAULT_BASEMAP, tile_source=None, zoom=None, dem_source=None,
+                 terrain_style=None):
+    """Draw the background of a map whose Web Mercator extent is ``ext``.
+
+    ``basemap``:
+
+    * ``"hillshade"`` (default): grey shaded relief from a DEM, as on GEOSLAM's
+      printed maps. USGS 3DEP in the US, Copernicus GLO-30/90 elsewhere; no key.
+      ``"hillshade-3dep"`` / ``"hillshade-copernicus"`` force one DEM.
+    * ``"usgs-relief"``, ``"usgs-topo"``, ``"usgs-imagery"``: USGS tiles (US only).
+    * ``"synthetic"``: the same grey hillshade of made-up terrain (offline preview).
+    * ``"none"`` or None: no background.
+
+    ``dem_source(ext, width, height) -> elevations`` overrides the DEM download.
+    Returns the attribution text (or None). If the download fails the map gets
+    a plain background and a note, and the rest of the figure is still drawn.
+    """
+    if basemap in (None, "none"):
+        return None
+    style = terrain_style or terrain.DEFAULT_STYLE
+    try:
+        if basemap in HILLSHADE_SOURCES or basemap == "synthetic":
+            src = terrain.synthetic_dem if basemap == "synthetic" else (dem_source or HILLSHADE_SOURCES[basemap])
+            img, credit = terrain.terrain_image(ext, source=src, style=style)
+            ax.imshow(img, extent=ext, origin="upper", interpolation="bilinear", zorder=0)
+        else:
+            prov = bm.PROVIDERS[basemap]
+            img, iext = bm.fetch_basemap(ext, prov, zoom=zoom, tile_source=tile_source)
+            ax.imshow(img, extent=iext, interpolation="spline36", zorder=0, origin="upper")
+            credit = prov.attribution
+    except KeyError:
+        raise ValueError(f"unknown basemap {basemap!r}; choose from {', '.join(BASEMAPS)}") from None
+    except Exception as exc:  # network down etc.: plain background, keep going
+        ax.set_facecolor("#e9e9e6")
+        credit = f"Basemap unavailable ({type(exc).__name__}: {exc})"[:160]
+    ax.set_xlim(ext[0], ext[1])
+    ax.set_ylim(ext[2], ext[3])
+    return credit
+
+
+def setup_map(ax, table, bounds=0.5, basemap=DEFAULT_BASEMAP, tile_source=None, zoom=None,
+              attribution=True, dem_source=None, terrain_style=None):
     """Prepare a Web Mercator map axes with basemap and labelled lon/lat graticule."""
     lon0, lon1, lat0, lat1 = map_extent(table, bounds)
     x0, y0 = bm.lonlat_to_merc(lon0, lat0)
@@ -195,23 +243,7 @@ def setup_map(ax, table, bounds=0.5, basemap="esri-terrain", api_key=None, tile_
     ax.set_xlim(ext[0], ext[1])
     ax.set_ylim(ext[2], ext[3])
     ax.set_aspect("equal", adjustable="box")
-    credit = None
-    if basemap not in (None, "none"):
-        src = tile_source
-        if basemap == "synthetic":
-            src, prov = bm.synthetic_terrain_tile, bm.PROVIDERS["esri-terrain"]
-            credit = "Synthetic offline basemap (preview only)"
-        else:
-            prov = bm.PROVIDERS[basemap]
-            credit = prov.attribution
-        try:
-            img, iext = bm.fetch_basemap(ext, prov, zoom=zoom, api_key=api_key, tile_source=src)
-            ax.imshow(img, extent=iext, interpolation="spline36", zorder=0, origin="upper")
-        except Exception as exc:  # network down etc.: plain background, keep going
-            ax.set_facecolor("#e8e4d2")
-            credit = f"Basemap unavailable ({type(exc).__name__}: {exc})"[:120]
-        ax.set_xlim(ext[0], ext[1])
-        ax.set_ylim(ext[2], ext[3])
+    credit = draw_basemap(ax, ext, basemap, tile_source, zoom, dem_source, terrain_style)
 
     # graticule labelled on all four sides
     glon0, glat0 = bm.merc_to_lonlat(ext[0], ext[2])
@@ -231,6 +263,7 @@ def setup_map(ax, table, bounds=0.5, basemap="esri-terrain", api_key=None, tile_
     for sp in ax.spines.values():
         sp.set_linewidth(0.8)
     if attribution and credit:
+        credit = "\n".join(textwrap.fill(line, 120) for line in credit.split("\n"))
         ax.text(0.995, 0.004, credit, transform=ax.transAxes, ha="right", va="bottom", fontsize=6,
                 color="0.25", zorder=60, fontfamily=SANS,
                 bbox=dict(boxstyle="square,pad=0.15", fc="w", ec="none", alpha=0.6))
@@ -421,14 +454,15 @@ def _default_title(data_label, one_line):
 # ---------------------------------------------------------------------------
 
 def symbol_map(result: StrainResult, table, path=None, title=None, data_label="NGL MIDAS",
-               logo=None, basemap="esri-terrain", api_key=None, tile_source=None, bounds=0.5,
-               scale_km=None, min_strain=0.1, max_strain=300.0, zoom=None):
+               logo=None, basemap=DEFAULT_BASEMAP, tile_source=None, dem_source=None, bounds=0.5,
+               scale_km=None, min_strain=0.1, max_strain=300.0, zoom=None, terrain_style=None):
     """Landscape strain-rate symbol map (the 2020 ``symbol_map_full`` layout)."""
     with plt.rc_context({"font.family": SERIF}):
         fig = plt.figure(figsize=(20, 15))
         gs = fig.add_gridspec(30, 40, wspace=0.0, hspace=0.0, left=0.02, right=0.97, top=0.97, bottom=0.03)
         ax = fig.add_subplot(gs[:, 11:])
-        setup_map(ax, table, bounds, basemap, api_key, tile_source, zoom)
+        setup_map(ax, table, bounds, basemap, tile_source, zoom, dem_source=dem_source,
+                  terrain_style=terrain_style)
         x, y = draw_triangle_and_sites(ax, table)
         size = 0.085 * (ax.get_xlim()[1] - ax.get_xlim()[0])
         draw_strain_symbol(ax, result, (x.mean(), y.mean()), size, min_strain, max_strain)
@@ -457,15 +491,16 @@ def symbol_map(result: StrainResult, table, path=None, title=None, data_label="N
 
 
 def strain_map(result: StrainResult, table, path=None, title=None, data_label="NGL MIDAS",
-               velocity_label="Velocity Relative to North America", logo=None, basemap="esri-terrain",
-               api_key=None, tile_source=None, bounds=0.5, scale_km=None, ref_velocity=None,
-               zoom=None):
+               velocity_label="Velocity Relative to North America", logo=None, basemap=DEFAULT_BASEMAP,
+               tile_source=None, dem_source=None, bounds=0.5, scale_km=None, ref_velocity=None,
+               zoom=None, terrain_style=None):
     """Portrait strain-ellipse map with velocities (the 2020 ``strain_map_full`` layout)."""
     with plt.rc_context({"font.family": SERIF}):
         fig = plt.figure(figsize=(15, 20))
         gs = fig.add_gridspec(40, 30, left=0.03, right=0.97, top=0.98, bottom=0.02, wspace=0.4, hspace=0.35)
         ax = fig.add_subplot(gs[:30, :])
-        setup_map(ax, table, bounds, basemap, api_key, tile_source, zoom)
+        setup_map(ax, table, bounds, basemap, tile_source, zoom, dem_source=dem_source,
+                  terrain_style=terrain_style)
         x, y = draw_triangle_and_sites(ax, table)
         mx0, mx1 = ax.get_xlim()
         width = mx1 - mx0
@@ -537,10 +572,10 @@ def _stations_union(tables):
     return allt.drop_duplicates("site").reset_index(drop=True)
 
 
-def network_map(results, tables, path=None, kind="symbol", basemap="esri-terrain", api_key=None,
-                tile_source=None, bounds=0.5, scale_km=None, tri_colors=None, lines=None,
+def network_map(results, tables, path=None, kind="symbol", basemap=DEFAULT_BASEMAP,
+                tile_source=None, dem_source=None, bounds=0.5, scale_km=None, tri_colors=None, lines=None,
                 velocities=True, min_strain=0.1, max_strain=None, zoom=None, title=None,
-                figsize=(15, 15)):
+                figsize=(15, 15), terrain_style=None):
     """Several triangles on one map, like the 2021 Raton, NM figures.
 
     ``kind="symbol"`` draws each triangle's strain-rate symbol at its centroid;
@@ -557,7 +592,8 @@ def network_map(results, tables, path=None, kind="symbol", basemap="esri-terrain
     with plt.rc_context({"font.family": SERIF}):
         fig = plt.figure(figsize=figsize)
         ax = fig.add_axes([0.05, 0.04, 0.78, 0.9])
-        setup_map(ax, stations, bounds, basemap, api_key, tile_source, zoom)
+        setup_map(ax, stations, bounds, basemap, tile_source, zoom, dem_source=dem_source,
+                  terrain_style=terrain_style)
         width = ax.get_xlim()[1] - ax.get_xlim()[0]
         sx, sy = bm.lonlat_to_merc(stations["lon"].to_numpy(float), stations["lat"].to_numpy(float))
         if velocities:

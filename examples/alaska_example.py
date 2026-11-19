@@ -18,7 +18,7 @@ table = from_records([
     dict(site="AC62", lat=63.083606, lon=-146.312695, ve=-8.66512, vn=3.464374, sig_e=0.3, sig_n=0.3),
     dict(site="AB37", lat=62.967322, lon=-145.451877, ve=-9.815231, vn=5.922223, sig_e=0.3, sig_n=0.3),
 ])
-basemap = "synthetic" if "--offline" in sys.argv else "esri-terrain"
+basemap = "synthetic" if "--offline" in sys.argv else "hillshade"
 logo = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--logo=")), None)
 
 r = compute_strain(table)

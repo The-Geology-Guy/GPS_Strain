@@ -42,7 +42,7 @@ def table(sites, sigma=0.05):
 
 
 if __name__ == "__main__":
-    basemap = "synthetic" if "--offline" in sys.argv else "esri-terrain"
+    basemap = "synthetic" if "--offline" in sys.argv else "hillshade"
     tables = [table(t) for t in TRIANGLES]
     results = [compute_strain(t) for t in tables]
     for r in results:

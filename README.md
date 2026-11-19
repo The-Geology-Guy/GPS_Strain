@@ -18,12 +18,12 @@ Give it three or more stations and it reports the following, then draws the two 
 
 <p align="center"><img src="examples/raton_network_ellipse.png" width="600"/></p>
 
-<sub>Example images were rendered offline with the synthetic preview basemap. With network access the default basemap is Esri World Terrain Base.</sub>
+<sub>These example images were rendered offline, so their terrain is the made-up preview relief (`--basemap synthetic`), not the real landscape. With network access the maps use real terrain: a grey hillshade from USGS 3DEP or Copernicus elevation data.</sub>
 
 ## Install
 
 ```bash
-pip install git+https://github.com/The-Geology-Guy/GPS_Strain@v2-rebuild
+pip install git+https://github.com/The-Geology-Guy/GPS_Strain
 ```
 
 Requires Python ≥ 3.11 with numpy, pandas, matplotlib, requests and Pillow. No cartopy or GDAL is needed.
@@ -37,8 +37,8 @@ Command line:
 # writes tahoe_symbol.pdf and tahoe_strain.pdf
 gps-strain P146 P149 P150 -o tahoe
 
-# the original Stamen terrain-background look (needs a Stadia Maps key)
-gps-strain P146 P149 P150 -o tahoe --basemap stadia-terrain-background --api-key YOUR_KEY
+# USGS topographic map tiles instead of the grey hillshade (US only)
+gps-strain P146 P149 P150 -o tahoe --basemap usgs-topo
 
 # the sheets carry a block-letter "GPS STRAIN" wordmark; swap in your own logo (file or URL)
 gps-strain P146 P149 P150 -o tahoe --logo my_logo.png
@@ -67,7 +67,7 @@ r = compute_strain(sta)                  # frame="enu" (default) or "utm"
 print(r.report())
 r.e1, r.e2, r.azimuth_s1, r.max_shear, r.rotation, r.sigma, r.mc
 plotting.symbol_map(r, sta, "symbol.pdf")
-plotting.strain_map(r, sta, "strain.pdf", basemap="stadia-terrain-background")
+plotting.strain_map(r, sta, "strain.pdf", basemap="usgs-topo")
 plotting.network_map([r1, r2, r3], [t1, t2, t3], "network.pdf", kind="ellipse")  # or kind="symbol"
 ```
 
@@ -75,15 +75,15 @@ Original 2020–2021 figures, for comparison, are in [docs/reference_2020/](docs
 
 ## Basemaps
 
-| `--basemap` | Look | Key / cost |
+| `--basemap` | Look | Coverage / licence |
 |---|---|---|
-| `esri-terrain` (default) | Hillshade, tan/green land, blue water: closest to Stamen terrain-background | A distributed app needs an ArcGIS Location Platform key (`ESRI_API_KEY`); 2M tiles/month free |
-| `stadia-terrain-background` | The exact Stamen style the 2020 maps used | Stadia key (`STADIA_API_KEY`). The free tier is non-commercial; paid plans start at $20/mo. Print rights are limited (see `docs/research/04_costs.md`). |
-| `usgs-relief`, `usgs-topo`, `usgs-imagery` | USGS The National Map (as used by the GEOSLAM web app) | Public domain, no key, printing allowed; **US and territories only** |
-| `esri-shaded-relief`, `esri-physical`, `esri-imagery`, `opentopomap` | Alternatives | Attribution printed automatically |
-| `synthetic` | Offline procedural preview | None |
+| `hillshade` (default) | Grey shaded relief computed from elevation data, the same look as GEOSLAM's printed maps. Water is left pale. | USGS 3DEP in the US (public domain), Copernicus GLO-30/90 elsewhere (free licence, credit printed on the map). No key, no print limits. |
+| `hillshade-3dep`, `hillshade-copernicus` | The same, forcing one elevation source | As above |
+| `usgs-relief`, `usgs-topo`, `usgs-imagery` | USGS The National Map tiles (the same maps geoslam.org shows) | Public domain, no key; **US and territories only** |
+| `synthetic` | Grey hillshade of made-up terrain, for offline previews and tests | None (labelled on the map as not real) |
+| `none` | No background | |
 
-Tiles are cached in `~/.cache/gps_strain/tiles`.
+Elevation downloads and tiles are cached in `~/.cache/gps_strain/` (set `GPS_STRAIN_CACHE` to move it). If the download fails, the map is still drawn on a plain background with a note.
 
 ## Tests
 

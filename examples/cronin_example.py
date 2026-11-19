@@ -23,6 +23,6 @@ for frame in ("utm", "enu"):
     print(f"===== frame = {frame} =====")
     print(r.report(), "\n")
 
-basemap = "synthetic" if "--offline" in sys.argv else "esri-terrain"
+basemap = "synthetic" if "--offline" in sys.argv else "hillshade"
 plotting.symbol_map(r, table, "cronin_symbol.png", basemap=basemap)
 plotting.strain_map(r, table, "cronin_strain.png", basemap=basemap)
