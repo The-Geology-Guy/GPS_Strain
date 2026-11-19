@@ -1,5 +1,7 @@
 # GPS_Strain
 
+[![tests](https://github.com/The-Geology-Guy/GPS_Strain/actions/workflows/tests.yml/badge.svg)](https://github.com/The-Geology-Guy/GPS_Strain/actions/workflows/tests.yml)
+
 **Horizontal infinitesimal strain rate from GPS/GNSS station velocities**: a Python implementation of the triangle strain method of [Vincent Cronin](https://croninprojects.org/Vince/) (Baylor) and Phil Resor (Wesleyan), taught in the SERC/GETSI module [*GPS, Strain, and Earthquakes*](https://serc.carleton.edu/getsi/teaching_materials/gps_strain/index.html).
 
 > **Version 2 (in development).** The 2020 code no longer installed or ran, and it computed velocities incorrectly (see [docs/AUDIT_2020.md](docs/AUDIT_2020.md)). The core has been rebuilt and is validated against Cronin & Resor's published worked example. The original file is kept in `legacy/`.

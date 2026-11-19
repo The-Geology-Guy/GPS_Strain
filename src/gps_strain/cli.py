@@ -13,6 +13,7 @@ Examples::
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 
 from . import data, plotting
@@ -52,6 +53,7 @@ def main(argv=None):
     p.add_argument("--triangles", nargs="+", metavar="A,B,C",
                    help="several triangles (comma-separated station IDs) for network maps")
     a = p.parse_args(argv)
+    logging.basicConfig(format="warning: %(message)s", level=logging.WARNING, stream=sys.stderr)
 
     if a.triangles:
         src = data.read_table(a.table, units=a.units) if a.table else data.load_midas(a.plate)

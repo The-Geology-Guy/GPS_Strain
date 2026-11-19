@@ -44,6 +44,7 @@ SITE_COLORS = ["g", "b", "r", "orange", "m", "c"]
 SERIF = ["Georgia", "Gelasio", "DejaVu Serif"]
 SANS = ["Arial", "Liberation Sans", "Helvetica", "DejaVu Sans"]
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
+log = logging.getLogger("gps_strain")
 HALO = [patheffects.withStroke(linewidth=4, foreground="w")]
 HALO_THIN = [patheffects.withStroke(linewidth=3, foreground="w")]
 ARROW_CASING = [patheffects.withStroke(linewidth=4, foreground="w"), patheffects.Normal()]
@@ -274,6 +275,7 @@ def draw_basemap(ax, ext, basemap=DEFAULT_BASEMAP, tile_source=None, zoom=None, 
     except Exception as exc:  # network down etc.: plain background, keep going
         ax.set_facecolor("#e9e9e6")
         credit = f"Basemap unavailable ({type(exc).__name__}: {exc})"[:160]
+        log.warning(credit)
     ax.set_xlim(ext[0], ext[1])
     ax.set_ylim(ext[2], ext[3])
     return credit
@@ -295,7 +297,9 @@ def draw_faults(ax, ext, faults=True, source="auto", style=CLASSIC):
         try:
             faults, credit = qf.faults_in_box(float(lon0), float(lat0), float(lon1), float(lat1), source)
         except Exception as exc:  # network down etc.: the map is still drawn
-            return f"Faults unavailable ({type(exc).__name__}: {exc})"[:160]
+            note = f"Faults unavailable ({type(exc).__name__}: {exc})"[:160]
+            log.warning(note)
+            return note
     lw = 2.2 if style.edge else 1.5
     edge = outline(lw, 0.9, "k") if style.edge else None
     n = 0

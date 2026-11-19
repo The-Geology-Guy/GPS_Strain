@@ -1,0 +1,74 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 9 * * 1"   # Mondays: catches changes in the live data services
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Install
+        run: python -m pip install -e ".[test]"
+      - name: Test (offline)
+        env:
+          MPLBACKEND: Agg
+          GPS_STRAIN_CACHE: ${{ runner.temp }}/gps_strain_cache
+        run: python -m pytest -q
+
+  live:
+    # Real services: NGL MIDAS, USGS 3DEP, Copernicus on AWS, USGS Quaternary faults.
+    # The maps are uploaded as an artifact so they can be looked at.
+    name: live data and maps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install
+        run: python -m pip install -e .
+      - name: Render maps from live data
+        env:
+          MPLBACKEND: Agg
+        run: |
+          mkdir -p maps && cd maps
+          run() { gps-strain "$@" 2> >(tee -a warnings.txt >&2); }
+          run P146 P149 P150 -o tahoe --format png
+          run AC63 AC62 AB37 -o alaska --format png
+          run AC63 AC62 AB37 -o alaska_vis --format png --visibility
+          run P146 P149 P150 -o tahoe_copernicus --format png --basemap hillshade-copernicus --map strain
+          run P146 P149 P150 -o tahoe_topo --format png --basemap usgs-topo --map strain
+          sleep 1
+          if grep -q "unavailable" warnings.txt; then
+            echo "::error::a terrain, tile or fault download failed (see warnings above)"; exit 1
+          fi
+          ls -la
+      - uses: actions/upload-artifact@v4
+        with:
+          name: live-maps
+          path: maps/*.png
+          retention-days: 30

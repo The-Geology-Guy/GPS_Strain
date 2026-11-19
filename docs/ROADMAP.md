@@ -43,7 +43,7 @@ Run on a normal connection on 18 Nov 2026 (`gps-strain P146 P149 P150 -o tahoe`,
 6. Second validation case from the GETSI Excel calculator and Tohoku results, at `https://cdn.serc.carleton.edu/files/getsi/teaching_materials/gps_strain/` (`gps_strain_calculator_excel.v3.xls`, `gps_strain_calculator_results.xlsx`). Cross-check against Strain_2D (`delaunay_flat`).
 7. Networks: automatic Delaunay triangulation over many stations with a skinny/oversized-triangle filter, feeding `network_map` (which already draws hand-picked triangles).
 8. Optional EarthScope/GAGE NAM14 source (free login and token).
-9. GitHub Actions CI on Linux, Mac and Windows; publish to PyPI.
+9. Done: GitHub Actions CI on Linux, Mac and Windows, with a live-maps job. Still to do: publish to PyPI.
 
 ## gps-strain.org (web app)
 
