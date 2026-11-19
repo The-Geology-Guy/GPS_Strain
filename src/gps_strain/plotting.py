@@ -309,7 +309,10 @@ def draw_basemap(ax, ext, basemap=DEFAULT_BASEMAP, tile_source=None, zoom=None, 
             ax.imshow(img, extent=ext, origin="upper", interpolation="bilinear", zorder=0)
         else:
             prov = bm.PROVIDERS[basemap]
-            img, iext = bm.fetch_basemap(ext, prov, zoom=zoom, tile_source=tile_source)
+            # tile detail follows the terrain width (2400 px -> the 2000 px tile target used before;
+            # the web app's small previews need far fewer tiles)
+            img, iext = bm.fetch_basemap(ext, prov, zoom=zoom, tile_source=tile_source,
+                                         target_px=int(terrain.TARGET_PX * 2000 / 2400))
             if greyscale:
                 img = to_greyscale(img)
             ax.imshow(img, extent=iext, interpolation="spline36", zorder=0, origin="upper")
