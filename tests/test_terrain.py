@@ -433,7 +433,7 @@ def test_faults_sit_between_terrain_and_symbols():
                         if a not in fault_lines)
         assert terrain_z < plotting.FAULT_ZORDER < symbols_z
         labels = [tx.get_text() for tx in ax.get_legend().get_texts()]
-        assert "Quaternary fault" in labels
+        assert plotting.FAULT_LABEL == "Fault" and "Fault" in labels
     # fetched faults are not drawn on the made-up offline terrain
     fig = plotting.strain_map(r, t, None, basemap="synthetic")
     assert not [ln for ln in fig.axes[0].lines if ln.get_color() == plotting.FAULT_COLOR]

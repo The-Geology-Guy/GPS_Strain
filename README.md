@@ -18,7 +18,7 @@ Give it three or more stations and it reports the following, then draws the two 
 
 <p align="center"><img src="examples/raton_network_ellipse.png" width="600"/></p>
 
-<sub>Top: the Alaska triangle AC63–AC62–AB37 from <code>gps-strain AC63 AC62 AB37 -o alaska --format png</code>, with current NGL MIDAS velocities and USGS 3DEP terrain. Bottom: the 2021 Raton, NM network, rendered offline, so its terrain is the made-up preview relief (<code>--basemap synthetic</code>), not the real landscape.</sub>
+<sub>Top: the Alaska triangle AC63–AC62–AB37 from <code>gps-strain AC63 AC62 AB37 -o alaska --format png</code>, with current NGL MIDAS velocities, USGS 3DEP terrain and USGS Quaternary faults (the Denali fault crosses near AC63). Bottom: the 2021 Raton, NM network, rendered offline, so its terrain is the made-up preview relief (<code>--basemap synthetic</code>), not the real landscape.</sub>
 
 ## Install
 

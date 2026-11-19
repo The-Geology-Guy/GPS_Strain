@@ -93,6 +93,7 @@ def map_style(visibility=False) -> MapStyle:
 DEFAULT_BASEMAP = "hillshade"
 FAULT_COLOR = "#e6d43a"   # GEOSLAM / Cronin report figures: yellow fault traces
 FAULT_ZORDER = 10         # above the terrain and grid, below every map symbol
+FAULT_LABEL = "Fault"     # legend entry; the credit line names the database
 HILLSHADE_SOURCES = {"hillshade": "auto", "hillshade-3dep": "3dep", "hillshade-copernicus": "copernicus"}
 BASEMAPS = [*HILLSHADE_SOURCES, *bm.PROVIDERS, "synthetic", "none"]
 
@@ -305,8 +306,7 @@ def draw_faults(ax, ext, faults=True, source="auto", style=CLASSIC):
                     solid_capstyle="round", path_effects=edge)
             n += 1
     if n:
-        ax.gps_strain_fault_label = ("Quaternary fault" if credit in (None, qf.CREDIT_USGS)
-                                     else "Active fault")
+        ax.gps_strain_fault_label = FAULT_LABEL  # the credit line names the database
     ax.set_xlim(ext[0], ext[1])
     ax.set_ylim(ext[2], ext[3])
     return credit
