@@ -354,7 +354,7 @@ function renderResults() {
   $("#tri-results").innerHTML = tris.map((t, i) => `
     <section class="plane-res">
       <h3><span style="display:none"></span><i class="tri-swatch" style="background:${TRI_COLORS[i % TRI_COLORS.length]}"></i>Triangle ${LETTERS[i]}: ${t.sites.map(esc).join("–")}</h3>
-      <table class="res-table"><tbody>${rows(t).map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("")}</tbody></table>
+      <table class="res-table"><tbody>${rows(t).map((r) => `<tr><td>${r[0]}</td><td>${r[1]}${r[2] ? `<span class="unit">${r[2]}</span>` : ""}</td></tr>`).join("")}</tbody></table>
       ${t.warnings.length ? `<ul class="res-warn">${t.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
       <details><summary>Full report</summary><pre class="res-report">${esc(t.report)}</pre></details>
     </section>`).join("");

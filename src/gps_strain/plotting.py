@@ -767,7 +767,8 @@ def _default_title(data_label, one_line):
 def symbol_map(result: StrainResult, table, path=None, title=None, data_label="NGL MIDAS",
                logo=None, basemap=DEFAULT_BASEMAP, tile_source=None, dem_source=None, bounds=0.5,
                scale_km=None, min_strain=0.1, max_strain=300.0, zoom=None, terrain_style=None,
-               fit_symbol=True, visibility=False, faults=True, fault_source="auto", greyscale=False):
+               fit_symbol=True, visibility=False, faults=True, fault_source="auto", greyscale=False,
+               frame_stations=True):
     """Landscape strain-rate symbol map (the 2020 ``symbol_map_full`` layout).
 
     ``visibility=True`` ("Increase visibility") draws the overlays thicker
@@ -779,10 +780,11 @@ def symbol_map(result: StrainResult, table, path=None, title=None, data_label="N
     faults over made-up terrain would mislead). ``greyscale=True`` draws the
     USGS tile basemaps (topo, relief, imagery) in grey.
 
-    With ``fit_symbol`` (default) the map zooms in, if needed, so the symbol
-    at the centroid stays inside the triangle; the symbol keeps its size on
-    the page. If the stations would not fit at that zoom, the symbol is drawn
-    smaller instead.
+    With ``frame_stations`` (default) the map is framed tightly on the
+    stations (a :data:`STATION_PAD` margin on each side) so the triangle
+    fills the map; ``False`` keeps the 2020 framing (``bounds`` degrees of
+    padding). With ``fit_symbol`` (default) the symbol is drawn smaller if it
+    would otherwise reach past a side of the triangle.
     """
     style = map_style(visibility)
     with plt.rc_context({"font.family": SERIF}):
@@ -791,7 +793,7 @@ def symbol_map(result: StrainResult, table, path=None, title=None, data_label="N
         ax = fig.add_subplot(gs[:, 11:])
         fit = symbol_fit_width(result, table, min_strain, max_strain) if fit_symbol else None
         setup_map(ax, table, bounds, basemap, tile_source, zoom, dem_source=dem_source,
-                  terrain_style=terrain_style, max_width=fit, style=style,
+                  terrain_style=terrain_style, max_width=0.0 if frame_stations else fit, style=style,
                   faults=_faults_for(basemap, faults), fault_source=fault_source, greyscale=greyscale)
         x, y = draw_triangle_and_sites(ax, table, style=style)
         width = ax.get_xlim()[1] - ax.get_xlim()[0]
@@ -825,7 +827,7 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
                velocity_label="Velocity Relative to North America", logo=None, basemap=DEFAULT_BASEMAP,
                tile_source=None, dem_source=None, bounds=0.5, scale_km=None, ref_velocity=None,
                zoom=None, terrain_style=None, fit_ellipse=True, visibility=False, faults=True,
-               fault_source="auto", greyscale=False):
+               fault_source="auto", greyscale=False, frame_stations=True):
     """Portrait strain-ellipse map with velocities (the 2020 ``strain_map_full`` layout).
 
     ``visibility=True`` ("Increase visibility") draws the overlays thicker
@@ -837,10 +839,12 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
     faults over made-up terrain would mislead). ``greyscale=True`` draws the
     USGS tile basemaps (topo, relief, imagery) in grey.
 
-    With ``fit_ellipse`` (default) the map zooms in, if needed, so the strain
-    ellipse at the centroid stays inside the triangle, as on the 2020 maps;
-    the ellipse keeps its size on the page (radius 11% of the map width). If
-    the stations would not fit at that zoom, the ellipse is drawn smaller.
+    With ``frame_stations`` (default) the map is framed tightly on the
+    stations (a :data:`STATION_PAD` margin on each side) so the triangle
+    fills the map; ``False`` keeps the 2020 framing. With ``fit_ellipse``
+    (default) the strain ellipse (radius 11% of the map width) is drawn
+    smaller if it would otherwise reach past a side of the triangle, as on the
+    2020 maps; without ``frame_stations`` the map zooms in to make room.
     """
     style = map_style(visibility)
     with plt.rc_context({"font.family": SERIF}):
@@ -849,7 +853,7 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
         ax = fig.add_subplot(gs[:30, :])
         fit = ellipse_fit_width(result, table) if fit_ellipse else None
         setup_map(ax, table, bounds, basemap, tile_source, zoom, dem_source=dem_source,
-                  terrain_style=terrain_style, max_width=fit, style=style,
+                  terrain_style=terrain_style, max_width=0.0 if frame_stations else fit, style=style,
                   faults=_faults_for(basemap, faults), fault_source=fault_source, greyscale=greyscale)
         x, y = draw_triangle_and_sites(ax, table, style=style)
         mx0, mx1 = ax.get_xlim()

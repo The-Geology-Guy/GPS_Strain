@@ -234,21 +234,40 @@ def test_strain_ellipse_fits_inside_triangle(stations):
     ax = fig.axes[0]
     width = ax.get_xlim()[1] - ax.get_xlim()[0]
     fit = plotting.ellipse_fit_width(r, t)
-    default = plotting.strain_map(r, t, None, basemap="none", fit_ellipse=False, faults=False).axes[0]
-    assert width < default.get_xlim()[1] - default.get_xlim()[0]   # zoomed in ...
-    assert fit * (1 - 1e-9) <= width <= fit * 1.1                  # ... to the fit (or the station margin)
-    R = plotting.ELLIPSE_FRAC * min(width, fit)                    # 11% of the map when it can be
+    old = plotting.strain_map(r, t, None, basemap="none", fit_ellipse=False, faults=False,
+                              frame_stations=False).axes[0]
+    assert width <= old.get_xlim()[1] - old.get_xlim()[0] + 1e-6   # never wider than the 2020 framing
+    R = plotting.ELLIPSE_FRAC * min(width, fit)                    # 11% of the map when it fits
     tx, ty = bm.lonlat_to_merc(t["lon"].to_numpy(float), t["lat"].to_numpy(float))
     th = np.linspace(0, 2 * np.pi, 721)
     circ = np.vstack([np.cos(th), np.sin(th)])
     F = np.eye(2) + plotting.exaggeration_for(r) * r.strain_tensor
     for pts in (circ, F @ circ):
         assert _inside(tx.mean() + R * pts[0], ty.mean() + R * pts[1], tx, ty)
-    # every station keeps a margin inside the map
+    # every station keeps the margin, and the frame is as tight as that allows
     x0, x1 = ax.get_xlim()
     y0, y1 = ax.get_ylim()
-    assert ((tx - x0) / (x1 - x0)).min() >= plotting.STATION_PAD - 1e-9
-    assert ((x1 - tx) / (x1 - x0)).min() >= plotting.STATION_PAD - 1e-9
+    mx = min(((tx - x0) / (x1 - x0)).min(), ((x1 - tx) / (x1 - x0)).min())
+    my = min(((ty - y0) / (y1 - y0)).min(), ((y1 - ty) / (y1 - y0)).min())
+    assert mx >= plotting.STATION_PAD - 1e-9 and my >= plotting.STATION_PAD - 1e-9
+    assert mx == pytest.approx(plotting.STATION_PAD, abs=1e-6) or my <= plotting.STATION_PAD + plotting.LEGEND_PAD + 1e-6
+    plt.close("all")
+
+
+def test_symbol_sheet_framed_on_the_stations():
+    import matplotlib.pyplot as plt
+
+    from gps_strain import compute_strain, plotting
+    from gps_strain.data import from_records
+
+    t = from_records(TAHOE)
+    r = compute_strain(t, mc_samples=0)
+    ax = plotting.symbol_map(r, t, None, basemap="none", faults=False).axes[0]
+    old = plotting.symbol_map(r, t, None, basemap="none", faults=False, frame_stations=False).axes[0]
+    w, w_old = (np.ptp(a.get_xlim()) for a in (ax, old))
+    assert w < 0.6 * w_old                       # the triangle fills much more of the sheet
+    tx, ty = bm.lonlat_to_merc(t["lon"].to_numpy(float), t["lat"].to_numpy(float))
+    assert ((tx - ax.get_xlim()[0]) / w).min() >= plotting.STATION_PAD - 1e-9
     plt.close("all")
 
 
