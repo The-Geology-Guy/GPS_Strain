@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import patheffects
 from matplotlib.lines import Line2D
-from matplotlib.patches import FancyBboxPatch, Polygon
+from matplotlib.patches import Polygon, Rectangle
 
 from . import basemap as bm
 from . import terrain
@@ -285,6 +285,8 @@ LEGEND_PAD = 0.05      # extra room at the top for the station legend
 ELLIPSE_FRAC = 0.11    # strain-ellipse radius, as a fraction of the map width (2020 layout)
 SYMBOL_FRAC = 0.085    # 300-nanostrain symbol half-length, as a fraction of the map width
 FIT_MARGIN = 1.12      # keep the glyph this much clear of the triangle sides
+ROW_GAP = 0.035        # gap between the three boxes under the portrait map (fraction of its width)
+BOX_LW = 1.0           # border width of those boxes (matches the tables)
 
 
 def _hull(x, y):
@@ -524,36 +526,22 @@ def elongation_legend(ax, min_strain=0.1, max_strain=300.0):
             fontfamily=SERIF)
 
 
-def ellipse_legend_box(ax):
-    ax.axis("off")
-    h = [Line2D([0], [0], color=S1_COLOR, lw=1.5, label="$S_{1H}$"),
-         Line2D([0], [0], marker="$◌$", color="w", markeredgecolor="slategrey", markeredgewidth=0.5,
-                markerfacecolor="slategrey", markersize=20, label="Initial State"),
-         Line2D([0], [0], color=S2_COLOR, lw=1.5, label="$S_{2H}$"),
-         Line2D([0], [0], marker="o", color="w", markeredgecolor="k", markeredgewidth=1.1,
-                markerfacecolor="w", markersize=18, label="Strain Ellipse")]
-    leg = ax.legend(handles=h, ncol=2, loc="center", frameon=True, title="Strain Ellipse Legend",
-                    prop={"family": SERIF, "size": 14})
-    leg.get_frame().set_edgecolor("k")
-    leg.get_frame().set_linewidth(0.5)
-    leg.get_frame().set_alpha(0.5)
+def ellipse_legend_box(fig, rect):
+    """Strain-ellipse legend centred in a bordered box at ``rect`` = (x, y, w, h)
+    in figure coordinates."""
+    x, y, w, h = rect
+    fig.add_artist(Rectangle((x, y), w, h, transform=fig.transFigure, fc="w", ec="k", lw=BOX_LW))
+    h_ = [Line2D([0], [0], color=S1_COLOR, lw=1.5, label="$S_{1H}$"),
+          Line2D([0], [0], marker="$◌$", color="w", markeredgecolor="slategrey", markeredgewidth=0.5,
+                 markerfacecolor="slategrey", markersize=20, label="Initial State"),
+          Line2D([0], [0], color=S2_COLOR, lw=1.5, label="$S_{2H}$"),
+          Line2D([0], [0], marker="o", color="w", markeredgecolor="k", markeredgewidth=1.1,
+                 markerfacecolor="w", markersize=18, label="Strain Ellipse")]
+    leg = fig.legend(handles=h_, ncol=2, loc="center", bbox_to_anchor=(x + w / 2, y + h / 2),
+                     bbox_transform=fig.transFigure, frameon=False, title="Strain Ellipse Legend",
+                     prop={"family": SERIF, "size": 14})
     plt.setp(leg.get_title(), fontsize=14, fontfamily=SERIF)
     return leg
-
-
-def _top_align(fig, table, leg, ax_leg, ax_box, box_top):
-    """Line up the tops of the ellipse legend and the velocity-key box with
-    the top of the speed table (the row of boxes under the portrait map)."""
-    fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
-    to_fig = fig.transFigure.inverted()
-    top = to_fig.transform((0, table.get_window_extent(renderer).y1))[1]
-    p = ax_box.get_position()
-    ax_box.set_position([p.x0, top - box_top * p.height, p.width, p.height])
-    pl = ax_leg.get_position()
-    leg.set_loc("upper center")
-    leg.borderaxespad = 0.0
-    leg.set_bbox_to_anchor((pl.x0 + pl.width / 2, top), transform=fig.transFigure)
 
 
 def _table(ax, cells, header, fontsize=11.25, scale=1.75):
@@ -659,8 +647,8 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
 
         ax_t = fig.add_subplot(gs[30:33, :22])
         ax_t.axis("off")
-        ax_t.text(0.0, 0.45, title or _default_title(data_label, True), ha="left", va="center",
-                  fontsize=24, transform=ax_t.transAxes)
+        title_txt = ax_t.text(0.0, 0.45, title or _default_title(data_label, True), ha="left", va="center",
+                              fontsize=24, transform=ax_t.transAxes)
         # right edge of the logo on the map's right axis line (not its tick labels)
         ax.apply_aspect()
         mpos = ax.get_position()
@@ -669,38 +657,54 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
         ax_logo.set_position([lpos.x0, lpos.y0, mpos.x1 - lpos.x0, lpos.height])
         draw_logo(ax_logo, logo, align="right")
 
-        ax_leg = fig.add_subplot(gs[33:37, :10])
-        leg = ellipse_legend_box(ax_leg)
-
-        ax_v = fig.add_subplot(gs[33:37, 10:21])
-        ax_v.axis("off")
-        ax_v.add_patch(FancyBboxPatch((0.03, 0.08), 0.94, 0.84, boxstyle="square,pad=0.0",
-                                      transform=ax_v.transAxes, fc="w", ec="0.6", lw=1))
-        ax_v.text(0.5, 0.72, velocity_label, ha="center", va="center", fontsize=14,
-                  transform=ax_v.transAxes)
-        fig.canvas.draw()
-        # reference arrow with exactly the on-map length of `ref` mm/yr
-        p0 = ax.transData.transform((mx0, 0.0))
-        p1 = ax.transData.transform((mx0 + ref * k, 0.0))
-        L = (p1[0] - p0[0]) / fig.dpi / fig.get_size_inches()[0]  # figure fraction
-        pos = ax_v.get_position()
-        La = L / pos.width  # in ax_v axes fraction
-        ax_v.annotate("", xy=(0.2 + La, 0.36), xytext=(0.2, 0.36), xycoords="axes fraction",
-                      arrowprops=dict(arrowstyle="-|>,head_width=0.6,head_length=1.2", lw=7,
-                                      color="k", shrinkA=0, shrinkB=0))
-        ax_v.text(0.2 + La + 0.04, 0.36, f"{ref:g} mm/yr", transform=ax_v.transAxes, va="center",
-                  fontsize=12.5)
-
         speed = np.hypot(ve, vn)
         speed_tab = _table(fig.add_subplot(gs[33:36, 21:]),
                            [[s, f"{v:.6f}"] for s, v in zip(table["site"], speed)], ["sites", "Speed (mm/yr)"])
-        _top_align(fig, speed_tab, leg, ax_leg, ax_v, box_top=0.92)
-
         cells = [[r.site, f"{r.lon:.6f}", f"{r.lat:.6f}", f"{r.ve * 1000:.6f}", f"{r.sig_e * 1000:.6f}",
                   f"{r.vn * 1000:.6f}", f"{r.sig_n * 1000:.6f}"] for r in table.itertuples()]
-        _table(fig.add_subplot(gs[37:, :]), cells,
-               ["site", "longitude", "latitude", "E velocity (mm/yr)", "E uncertainty (mm/yr)",
-                "N velocity (mm/yr)", "N uncertainty (mm/yr)"])
+        station_tab = _table(fig.add_subplot(gs[37:, :]), cells,
+                             ["site", "longitude", "latitude", "E velocity (mm/yr)", "E uncertainty (mm/yr)",
+                              "N velocity (mm/yr)", "N uncertainty (mm/yr)"])
+
+        # Row of three boxes under the title, laid out from the station table's
+        # edges: legend flush left, speed table flush right, velocity key centred
+        # between them with equal gaps; all three share the speed table's height,
+        # and the row sits midway between the title and the station table.
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        to_fig = fig.transFigure.inverted()
+        (L, _), (R, _) = to_fig.transform(station_tab.get_window_extent(renderer).get_points())
+        (s0, sb), (s1, top) = to_fig.transform(speed_tab.get_window_extent(renderer).get_points())
+        w_side, h = s1 - s0, top - sb
+        # centre the row vertically between the title and the station table
+        title_bottom = to_fig.transform((0, title_txt.get_window_extent(renderer).y0))[1]
+        table_top = to_fig.transform((0, station_tab.get_window_extent(renderer).y1))[1]
+        new_top = (title_bottom + table_top) / 2 + h / 2
+        p = speed_tab.axes.get_position()
+        speed_tab.axes.set_position([p.x0 + R - s1, p.y0 + new_top - top, p.width, p.height])
+        top = new_top
+        gap = ROW_GAP * (R - L)
+        w_mid = (R - L) - 2 * w_side - 2 * gap
+        legend_rect = (L, top - h, w_side, h)
+        velocity_rect = (L + w_side + gap, top - h, w_mid, h)
+
+        ellipse_legend_box(fig, legend_rect)
+        ax_v = fig.add_axes(velocity_rect)
+        ax_v.axis("off")
+        ax_v.add_patch(Rectangle((0, 0), 1, 1, transform=ax_v.transAxes, fc="w", ec="k", lw=BOX_LW,
+                                 clip_on=False))
+        ax_v.text(0.5, 0.72, velocity_label, ha="center", va="center", fontsize=14,
+                  transform=ax_v.transAxes)
+        # reference arrow with exactly the on-map length of `ref` mm/yr
+        p0 = ax.transData.transform((mx0, 0.0))
+        p1 = ax.transData.transform((mx0 + ref * k, 0.0))
+        La = (p1[0] - p0[0]) / ax_v.get_window_extent(renderer).width  # in ax_v axes fraction
+        x0 = 0.5 - (La + 0.04 + 0.16) / 2  # centre arrow + label in the box
+        ax_v.annotate("", xy=(x0 + La, 0.32), xytext=(x0, 0.32), xycoords="axes fraction",
+                      arrowprops=dict(arrowstyle="-|>,head_width=0.6,head_length=1.2", lw=7,
+                                      color="k", shrinkA=0, shrinkB=0))
+        ax_v.text(x0 + La + 0.04, 0.32, f"{ref:g} mm/yr", transform=ax_v.transAxes, va="center",
+                  fontsize=12.5)
         if path:
             fig.savefig(path, dpi=150, edgecolor="k", bbox_inches="tight")
     return fig

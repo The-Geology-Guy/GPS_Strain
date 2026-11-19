@@ -314,9 +314,11 @@ def test_network_ellipses_shrink_to_fit_their_own_triangles():
     plt.close("all")
 
 
-def test_portrait_boxes_are_top_aligned():
+def test_portrait_box_row_layout():
+    """Legend flush with the station table's left edge, speed table flush with
+    its right edge, velocity key centred with equal gaps; same top and height."""
     import matplotlib.pyplot as plt
-    from matplotlib.patches import FancyBboxPatch
+    from matplotlib.patches import Rectangle
     from matplotlib.table import Table
 
     from gps_strain import compute_strain, plotting
@@ -329,10 +331,17 @@ def test_portrait_boxes_are_top_aligned():
     rend = fig.canvas.get_renderer()
     tables = [c for a in fig.axes for c in a.get_children() if isinstance(c, Table)]
     speed = next(tb for tb in tables if len(tb.get_celld()) == 2 * (len(t) + 1))
-    legend = next(a.get_legend() for a in fig.axes
-                  if a.get_legend() and a.get_legend().get_title().get_text() == "Strain Ellipse Legend")
-    box = next(p for a in fig.axes for p in a.patches if isinstance(p, FancyBboxPatch))
-    tops = [speed.get_window_extent(rend).y1, legend.get_frame().get_window_extent(rend).y1,
-            box.get_window_extent(rend).y1]
-    assert max(tops) - min(tops) < 2.0, tops
+    station = next(tb for tb in tables if tb is not speed)
+    legend_box = next(a for a in fig.artists if isinstance(a, Rectangle))
+    velocity_box = next(p for a in fig.axes for p in a.patches if isinstance(p, Rectangle))
+    st, sp = station.get_window_extent(rend), speed.get_window_extent(rend)
+    lg, vb = legend_box.get_window_extent(rend), velocity_box.get_window_extent(rend)
+    assert abs(lg.x0 - st.x0) < 2 and abs(sp.x1 - st.x1) < 2
+    assert abs((vb.x0 - lg.x1) - (sp.x0 - vb.x1)) < 2 and vb.x0 - lg.x1 > 10
+    for b in (lg, vb):
+        assert abs(b.y1 - sp.y1) < 2 and abs(b.height - sp.height) < 2
+    title = next(x for a in fig.axes for x in a.texts if x.get_text().startswith("GPS Triangle-Strain"))
+    above = title.get_window_extent(rend).y0 - sp.y1
+    below = sp.y0 - st.y1
+    assert abs(above - below) < 2
     plt.close("all")
