@@ -83,7 +83,7 @@ const dataReady = (async () => {
   }
   S.dataInfo = d;
   $("#data-note").textContent = `Velocities: NGL MIDAS, North America fixed, ${d.count.toLocaleString()} US stations, updated ${d.generated}.`;
-  await mapReady;
+  // the map may still be loading (it waits while the tab is in the background): don't hold the data up
   setData("all", { type: "FeatureCollection", features: d.rows.map((r) => ({ type: "Feature", properties: { site: r[0] }, geometry: { type: "Point", coordinates: [r[2], r[1]] } })) });
   return d;
 })();
@@ -154,9 +154,10 @@ mapReady.then(() => {
   });
   $("#show-faults").addEventListener("change", (e) => map.setLayoutProperty("faults", "visibility", e.target.checked ? "visible" : "none"));
   $("#show-all").addEventListener("change", (e) => map.setLayoutProperty("all", "visibility", e.target.checked ? "visible" : "none"));
-  dataReady.then(readHash).catch(() => {});
 });
-function setData(id, data) { const s = map.getSource(id); if (s) s.setData(data); }
+dataReady.then(readHash).catch(() => {});
+/* map layers are added once the map has loaded; data sent earlier is applied then */
+function setData(id, data) { mapReady.then(() => map.getSource(id)?.setData(data)); }
 
 /* labels for the chosen stations (DOM markers: no glyph server needed) */
 let labelMarkers = [];
@@ -253,7 +254,7 @@ $("#pick-clear").addEventListener("click", () => { S.current = []; afterSelectio
 function fitTo(stations) {
   if (!stations.length) return;
   const lons = stations.map((s) => s.lon), lats = stations.map((s) => s.lat);
-  map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 60, maxZoom: 10, duration: 600 });
+  mapReady.then(() => map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 60, maxZoom: 10, duration: 600 }));
 }
 
 /* manual entry */
@@ -317,7 +318,7 @@ async function runAll() {
     $("#results").hidden = false;
     $$(".step").forEach((s) => s.classList.add("is-done"));
     const [w, s, e, n] = out.geojson.bbox;
-    map.fitBounds([[w, s], [e, n]], { padding: { top: 50, bottom: 40, left: 40, right: 40 }, maxZoom: 11, duration: 600 });
+    mapReady.then(() => map.fitBounds([[w, s], [e, n]], { padding: { top: 50, bottom: 40, left: 40, right: 40 }, maxZoom: 11, duration: 600 }));
     writeHash();
     setStatus(`Done in ${((performance.now() - t0) / 1000).toFixed(1)} s.`, "ok");
     loadFaults([w, s, e, n]);
