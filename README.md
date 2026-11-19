@@ -43,6 +43,10 @@ gps-strain P146 P149 P150 -o tahoe --basemap usgs-topo
 # the sheets carry a block-letter "GPS STRAIN" wordmark; swap in your own logo (file or URL)
 gps-strain P146 P149 P150 -o tahoe --logo my_logo.png
 
+# "increase visibility": thicker lines and arrows with white edges, white panels behind
+# the scale bar and north arrow (easier to read over dark relief)
+gps-strain P146 P149 P150 -o tahoe --visibility
+
 # which stations are near a point?
 gps-strain --near 38.22 -122.31 --radius 30
 

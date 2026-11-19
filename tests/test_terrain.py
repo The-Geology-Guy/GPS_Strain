@@ -345,3 +345,29 @@ def test_portrait_box_row_layout():
     below = sp.y0 - st.y1
     assert abs(above - below) < 2
     plt.close("all")
+
+
+@pytest.mark.parametrize("vis", [False, True])
+def test_visibility_toggle(vis, tmp_path):
+    """visibility=True draws thicker overlays with white edges and panels;
+    False keeps the 2020 look. Both render every map product."""
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import FancyBboxPatch
+
+    from gps_strain import compute_strain, plotting
+    from gps_strain.data import from_records
+
+    t = from_records(TAHOE)
+    r = compute_strain(t, mc_samples=0)
+    fig = plotting.strain_map(r, t, tmp_path / "m.png", basemap="none", visibility=vis)
+    ax = fig.axes[0]
+    blue = [ln for ln in ax.lines if ln.get_color() == "blue"]
+    white_under = [ln for ln in ax.lines if ln.get_color() == "w" and ln.get_zorder() == 19]
+    panels = [p for p in ax.patches if isinstance(p, FancyBboxPatch)]
+    style = plotting.HIGH_VISIBILITY if vis else plotting.CLASSIC
+    assert blue[0].get_linewidth() == style.triangle_lw
+    assert bool(white_under) == vis and bool(panels) == vis
+    assert ax.collections[0].get_path_effects() if vis else not ax.collections[0].get_path_effects()
+    plotting.symbol_map(r, t, tmp_path / "s.png", basemap="none", visibility=vis)
+    plotting.network_map([r], [t], tmp_path / "n.png", kind="ellipse", basemap="none", visibility=vis)
+    plt.close("all")

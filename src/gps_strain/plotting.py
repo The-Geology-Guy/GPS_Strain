@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import math
+from dataclasses import dataclass
 import textwrap
 from pathlib import Path
 
@@ -30,7 +31,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import patheffects
 from matplotlib.lines import Line2D
-from matplotlib.patches import Polygon, Rectangle
+from matplotlib.patches import FancyBboxPatch, Polygon, Rectangle
 
 from . import basemap as bm
 from . import terrain
@@ -43,6 +44,50 @@ SERIF = ["Georgia", "Gelasio", "DejaVu Serif"]
 SANS = ["Arial", "Liberation Sans", "Helvetica", "DejaVu Sans"]
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 HALO = [patheffects.withStroke(linewidth=4, foreground="w")]
+HALO_THIN = [patheffects.withStroke(linewidth=3, foreground="w")]
+ARROW_CASING = [patheffects.withStroke(linewidth=4, foreground="w"), patheffects.Normal()]
+
+
+def outline(lw, width=2.5, color="w"):
+    """Path effect: a ``color`` edge of ``width`` points around a line of width ``lw``
+    (each dash of a dashed line gets its own edge)."""
+    return [patheffects.withStroke(linewidth=lw + 2 * width, foreground=color), patheffects.Normal()]
+PANEL_ALPHA = 0.85     # white panels behind the scale bar and north arrow
+
+
+@dataclass(frozen=True)
+class MapStyle:
+    """How the overlays (triangle, arrows, ellipse, scale bar...) are drawn."""
+
+    triangle_lw: float = 2.0
+    edge: bool = False             # white edges under lines/arrows, black rims on dots
+    dot_ms: float = 10.0
+    arrow_width: float = 0.006
+    ellipse_fill_alpha: float = 0.45
+    ellipse_lw: float = 2.0
+    ellipse_axis_lw: float = 6.0
+    scale_fontsize: float = 12.0
+    panels: bool = False           # white panels behind the scale bar and north arrow
+    legend_alpha: float = 0.75
+    credit_fontsize: float = 6.0
+    credit_alpha: float = 0.6
+
+
+CLASSIC = MapStyle()
+"""The 2020 look."""
+HIGH_VISIBILITY = MapStyle(triangle_lw=3.5, edge=True, dot_ms=12.0, arrow_width=0.0075,
+                           ellipse_fill_alpha=0.3, ellipse_lw=3.0, ellipse_axis_lw=7.0,
+                           scale_fontsize=14.0, panels=True, legend_alpha=0.92,
+                           credit_fontsize=7.0, credit_alpha=PANEL_ALPHA)
+"""``visibility=True``: thicker overlays with white edges, and white panels
+behind the scale bar and north arrow, so everything reads over dark relief."""
+
+
+def map_style(visibility=False) -> MapStyle:
+    """``visibility`` may be a bool ("Increase visibility") or a MapStyle."""
+    if isinstance(visibility, MapStyle):
+        return visibility
+    return HIGH_VISIBILITY if visibility else CLASSIC
 
 DEFAULT_BASEMAP = "hillshade"
 HILLSHADE_SOURCES = {"hillshade": "auto", "hillshade-3dep": "3dep", "hillshade-copernicus": "copernicus"}
@@ -93,21 +138,30 @@ def _symbol_fraction(e, min_strain, max_strain, lo=0.3, hi=1.0):
 # ---------------------------------------------------------------------------
 
 def draw_ellipse(ax, result: StrainResult, center=(0.0, 0.0), radius=1.0, exaggeration=None,
-                 fill_alpha=0.45, lw=2.0, axis_lw=6.0, zorder=30):
+                 fill_alpha=None, lw=None, axis_lw=None, zorder=30, style=CLASSIC):
     """Strain ellipse in the 2020 style: dashed initial circle, black ellipse,
     principal axes (S1H tomato, S2H cornflower), faint initial E-W/N-S axes.
 
     The deformation is F = I + k*E applied to a circle of ``radius`` (data
-    units) at ``center``; k defaults to :func:`exaggeration_for`.
+    units) at ``center``; k defaults to :func:`exaggeration_for`. Line widths
+    and fill default to ``style``; ``style.edge`` adds white edges.
     """
+    fill_alpha = style.ellipse_fill_alpha if fill_alpha is None else fill_alpha
+    lw = style.ellipse_lw if lw is None else lw
+    axis_lw = style.ellipse_axis_lw if axis_lw is None else axis_lw
     k = exaggeration or exaggeration_for(result)
     cx, cy = center
     th = np.linspace(0, 2 * np.pi, 361)
     circ = np.vstack([np.cos(th), np.sin(th)])
     F = np.eye(2) + k * result.strain_tensor
     ell = F @ circ
+    edge = (lambda w, e: outline(w, e)) if style.edge else (lambda w, e: None)
     ax.fill(cx + radius * circ[0], cy + radius * circ[1], color="w", alpha=fill_alpha, zorder=zorder, lw=0)
-    ax.plot(cx + radius * circ[0], cy + radius * circ[1], color="slategrey", lw=lw, ls="--", zorder=zorder + 1)
+    if style.edge:
+        ax.plot(cx + radius * circ[0], cy + radius * circ[1], color="w", lw=lw + 3.5, zorder=zorder + 1)
+    circle_lw = lw + 0.5 if style.edge else lw
+    ax.plot(cx + radius * circ[0], cy + radius * circ[1], color="slategrey", lw=circle_lw, ls="--",
+            zorder=zorder + 1)
     # faint initial axes
     ax.plot([cx - radius, cx + radius], [cy, cy], color=S1_COLOR, alpha=0.25, lw=axis_lw,
             solid_capstyle="butt", zorder=zorder + 1)
@@ -116,8 +170,9 @@ def draw_ellipse(ax, result: StrainResult, center=(0.0, 0.0), radius=1.0, exagge
     for az, e, col in ((result.azimuth_s1, result.e1, S1_COLOR), (result.azimuth_s2, result.e2, S2_COLOR)):
         u = _axis_vec(az) * (1 + k * e) * radius
         ax.plot([cx - u[0], cx + u[0]], [cy - u[1], cy + u[1]], color=col, lw=axis_lw,
-                solid_capstyle="butt", zorder=zorder + 2)
-    ax.plot(cx + radius * ell[0], cy + radius * ell[1], color="k", lw=lw, zorder=zorder + 3)
+                solid_capstyle="butt", zorder=zorder + 2, path_effects=edge(axis_lw, 2))
+    ax.plot(cx + radius * ell[0], cy + radius * ell[1], color="k", lw=lw, zorder=zorder + 3,
+            path_effects=edge(lw, 2))
     return k
 
 
@@ -221,7 +276,7 @@ def draw_basemap(ax, ext, basemap=DEFAULT_BASEMAP, tile_source=None, zoom=None, 
 
 
 def setup_map(ax, table, bounds=0.5, basemap=DEFAULT_BASEMAP, tile_source=None, zoom=None,
-              attribution=True, dem_source=None, terrain_style=None, max_width=None):
+              attribution=True, dem_source=None, terrain_style=None, max_width=None, style=CLASSIC):
     """Prepare a Web Mercator map axes with basemap and labelled lon/lat graticule.
 
     ``max_width`` (Web Mercator metres) zooms the map in to at most that width,
@@ -274,9 +329,9 @@ def setup_map(ax, table, bounds=0.5, basemap=DEFAULT_BASEMAP, tile_source=None, 
         sp.set_linewidth(0.8)
     if attribution and credit:
         credit = "\n".join(textwrap.fill(line, 120) for line in credit.split("\n"))
-        ax.text(0.995, 0.004, credit, transform=ax.transAxes, ha="right", va="bottom", fontsize=6,
-                color="0.25", zorder=60, fontfamily=SANS,
-                bbox=dict(boxstyle="square,pad=0.15", fc="w", ec="none", alpha=0.6))
+        ax.text(0.995, 0.004, credit, transform=ax.transAxes, ha="right", va="bottom",
+                fontsize=style.credit_fontsize, color="0.15", zorder=60, fontfamily=SANS,
+                bbox=dict(boxstyle="square,pad=0.2", fc="w", ec="none", alpha=style.credit_alpha))
     return ext
 
 
@@ -375,27 +430,33 @@ def symbol_fit_width(result: StrainResult, table, min_strain=0.1, max_strain=300
     return None if s is None else s / frac
 
 
-def draw_triangle_and_sites(ax, table, colors=SITE_COLORS, legend_loc="upper center", ms=10):
+def draw_triangle_and_sites(ax, table, colors=SITE_COLORS, legend_loc="upper center", style=CLASSIC):
     x, y = bm.lonlat_to_merc(table["lon"].to_numpy(float), table["lat"].to_numpy(float))
     xs, ys = np.append(x, x[0]), np.append(y, y[0])
-    ax.plot(xs, ys, color="blue", ls="--", lw=2, zorder=20)
+    if style.edge:  # solid white line under the dashes: a blue-and-white dashed line
+        ax.plot(xs, ys, color="w", lw=style.triangle_lw + 4, solid_joinstyle="round", zorder=19)
+        ax.plot(xs, ys, color="blue", ls=(0, (4, 2.5)), lw=style.triangle_lw, zorder=20)
+    else:
+        ax.plot(xs, ys, color="blue", ls="--", lw=style.triangle_lw, zorder=20)
     handles = []
     for i, site in enumerate(table["site"]):
         c = colors[i % len(colors)]
-        ax.plot(x[i], y[i], "o", ms=ms, color=c, zorder=50)
+        ax.plot(x[i], y[i], "o", ms=style.dot_ms, color=c, mec="k" if style.edge else c,
+                mew=1.5 if style.edge else 0, zorder=50)
         handles.append(Line2D([0], [0], marker="o", color="b", ls="--", markerfacecolor=c,
                               markeredgewidth=0, markersize=15, label=site))
     leg = ax.legend(handles=handles, ncol=len(handles), loc=legend_loc,
                     prop={"family": SERIF, "size": 15})
     leg.get_frame().set_edgecolor("k")
     leg.get_frame().set_linewidth(0.5)
-    leg.get_frame().set_alpha(0.75)
+    leg.get_frame().set_alpha(style.legend_alpha)
     leg.set_zorder(70)
     return x, y
 
 
-def draw_scale_bar(ax, length_km=None, loc=(0.5, 0.05), segments=5, lw=15):
-    """Alternating black/white bar with '0 km' and 'N km' labels."""
+def draw_scale_bar(ax, length_km=None, loc=(0.5, 0.05), segments=5, lw=15, style=CLASSIC):
+    """Alternating black/white bar with '0 km' and 'N km' labels (on a white
+    panel when ``style.panels``)."""
     x0, x1 = ax.get_xlim()
     y0, y1 = ax.get_ylim()
     xc, yc = x0 + loc[0] * (x1 - x0), y0 + loc[1] * (y1 - y0)
@@ -407,21 +468,49 @@ def draw_scale_bar(ax, length_km=None, loc=(0.5, 0.05), segments=5, lw=15):
     L = length_km * 1000 * k
     start = xc - L / 2
     seg = L / segments
+    if style.panels:
+        ax.plot([start, start + L], [yc, yc], color="k", lw=lw + 3, solid_capstyle="butt", zorder=55)
     for i in range(segments):
         ax.plot([start + i * seg, start + (i + 1) * seg], [yc, yc], color="k" if i % 2 == 0 else "w",
                 lw=lw, solid_capstyle="butt", zorder=55)
-    halo = [patheffects.withStroke(linewidth=1.5, foreground="w")]
-    dy = 0.012 * (y1 - y0)
-    ax.text(start, yc + dy, "0 km", ha="right", va="bottom", fontsize=12, fontfamily=SANS,
-            path_effects=halo, zorder=56)
-    ax.text(start + L, yc + dy, f"{length_km:g} km", ha="left", va="bottom", fontsize=12,
-            fontfamily=SANS, path_effects=halo, zorder=56)
+    dy = (0.014 if style.panels else 0.012) * (y1 - y0)
+    halo = HALO_THIN if style.panels else [patheffects.withStroke(linewidth=1.5, foreground="w")]
+    fs = style.scale_fontsize
+    labels = [ax.text(start, yc + dy, "0 km", ha="right", va="bottom", fontsize=fs, fontfamily=SANS,
+                      path_effects=halo, zorder=56),
+              ax.text(start + L, yc + dy, f"{length_km:g} km", ha="left", va="bottom", fontsize=fs,
+                      fontfamily=SANS, path_effects=halo, zorder=56)]
+    if style.panels:
+        _panel_behind(ax, [(start, yc), (start + L, yc)], labels, pad_px=10)
     return length_km
 
 
-def draw_north_arrow(ax, loc=(0.11, 0.05), fontsize=35):
-    ax.text(loc[0], loc[1], "▲\nN", transform=ax.transAxes, ha="center", va="bottom",
-            fontsize=fontsize, fontfamily=SANS, linespacing=0.9, path_effects=HALO, zorder=60)
+def _panel_behind(ax, points, texts, pad_px=8):
+    """White rounded panel behind map furniture (data points + text artists)."""
+    fig = ax.figure
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    boxes = [t.get_window_extent(renderer) for t in texts]
+    px = ax.transData.transform(np.asarray(points, float))
+    xs = [b.x0 for b in boxes] + [b.x1 for b in boxes] + list(px[:, 0])
+    ys = [b.y0 for b in boxes] + [b.y1 for b in boxes] + list(px[:, 1] - 12) + list(px[:, 1] + 12)
+    inv = ax.transAxes.inverted()
+    (ax0, ay0), (ax1, ay1) = inv.transform([(min(xs) - pad_px, min(ys) - pad_px),
+                                            (max(xs) + pad_px, max(ys) + pad_px)])
+    ax.add_patch(FancyBboxPatch((ax0, ay0), ax1 - ax0, ay1 - ay0, boxstyle="round,pad=0,rounding_size=0.01",
+                                transform=ax.transAxes, fc="w", ec="k", lw=0.8, alpha=PANEL_ALPHA,
+                                zorder=54))
+
+
+def draw_north_arrow(ax, loc=(0.11, 0.05), fontsize=35, style=CLASSIC):
+    if style.panels:
+        ax.text(loc[0], loc[1], "▲\nN", transform=ax.transAxes, ha="center", va="bottom",
+                fontsize=fontsize, fontfamily=SANS, linespacing=0.9, zorder=60,
+                bbox=dict(boxstyle="round,pad=0.25,rounding_size=0.3", fc="w", ec="k", lw=0.8,
+                          alpha=PANEL_ALPHA))
+    else:
+        ax.text(loc[0], loc[1], "▲\nN", transform=ax.transAxes, ha="center", va="bottom",
+                fontsize=fontsize, fontfamily=SANS, linespacing=0.9, path_effects=HALO, zorder=60)
 
 
 def _load_logo(logo):
@@ -567,27 +656,31 @@ def _default_title(data_label, one_line):
 def symbol_map(result: StrainResult, table, path=None, title=None, data_label="NGL MIDAS",
                logo=None, basemap=DEFAULT_BASEMAP, tile_source=None, dem_source=None, bounds=0.5,
                scale_km=None, min_strain=0.1, max_strain=300.0, zoom=None, terrain_style=None,
-               fit_symbol=True):
+               fit_symbol=True, visibility=False):
     """Landscape strain-rate symbol map (the 2020 ``symbol_map_full`` layout).
+
+    ``visibility=True`` ("Increase visibility") draws the overlays thicker
+    with white edges; see :data:`HIGH_VISIBILITY`.
 
     With ``fit_symbol`` (default) the map zooms in, if needed, so the symbol
     at the centroid stays inside the triangle; the symbol keeps its size on
     the page. If the stations would not fit at that zoom, the symbol is drawn
     smaller instead.
     """
+    style = map_style(visibility)
     with plt.rc_context({"font.family": SERIF}):
         fig = plt.figure(figsize=(20, 15))
         gs = fig.add_gridspec(30, 40, wspace=0.0, hspace=0.0, left=0.02, right=0.97, top=0.97, bottom=0.03)
         ax = fig.add_subplot(gs[:, 11:])
         fit = symbol_fit_width(result, table, min_strain, max_strain) if fit_symbol else None
         setup_map(ax, table, bounds, basemap, tile_source, zoom, dem_source=dem_source,
-                  terrain_style=terrain_style, max_width=fit)
-        x, y = draw_triangle_and_sites(ax, table)
+                  terrain_style=terrain_style, max_width=fit, style=style)
+        x, y = draw_triangle_and_sites(ax, table, style=style)
         width = ax.get_xlim()[1] - ax.get_xlim()[0]
         size = SYMBOL_FRAC * (min(width, fit) if fit else width)
         draw_strain_symbol(ax, result, (x.mean(), y.mean()), size, min_strain, max_strain)
-        draw_scale_bar(ax, scale_km)
-        draw_north_arrow(ax)
+        draw_scale_bar(ax, scale_km, style=style)
+        draw_north_arrow(ax, style=style)
 
         ax_t = fig.add_subplot(gs[:3, :10])
         ax_t.axis("off")
@@ -613,22 +706,26 @@ def symbol_map(result: StrainResult, table, path=None, title=None, data_label="N
 def strain_map(result: StrainResult, table, path=None, title=None, data_label="NGL MIDAS",
                velocity_label="Velocity Relative to North America", logo=None, basemap=DEFAULT_BASEMAP,
                tile_source=None, dem_source=None, bounds=0.5, scale_km=None, ref_velocity=None,
-               zoom=None, terrain_style=None, fit_ellipse=True):
+               zoom=None, terrain_style=None, fit_ellipse=True, visibility=False):
     """Portrait strain-ellipse map with velocities (the 2020 ``strain_map_full`` layout).
+
+    ``visibility=True`` ("Increase visibility") draws the overlays thicker
+    with white edges; see :data:`HIGH_VISIBILITY`.
 
     With ``fit_ellipse`` (default) the map zooms in, if needed, so the strain
     ellipse at the centroid stays inside the triangle, as on the 2020 maps;
     the ellipse keeps its size on the page (radius 11% of the map width). If
     the stations would not fit at that zoom, the ellipse is drawn smaller.
     """
+    style = map_style(visibility)
     with plt.rc_context({"font.family": SERIF}):
         fig = plt.figure(figsize=(15, 20))
         gs = fig.add_gridspec(40, 30, left=0.03, right=0.97, top=0.98, bottom=0.02, wspace=0.4, hspace=0.35)
         ax = fig.add_subplot(gs[:30, :])
         fit = ellipse_fit_width(result, table) if fit_ellipse else None
         setup_map(ax, table, bounds, basemap, tile_source, zoom, dem_source=dem_source,
-                  terrain_style=terrain_style, max_width=fit)
-        x, y = draw_triangle_and_sites(ax, table)
+                  terrain_style=terrain_style, max_width=fit, style=style)
+        x, y = draw_triangle_and_sites(ax, table, style=style)
         mx0, mx1 = ax.get_xlim()
         width = mx1 - mx0
 
@@ -639,11 +736,12 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
         # map metres per (mm/yr): the largest arrow is ~11% of the map width
         k = 0.11 * width / vmax
         ax.quiver(x, y, ve, vn, angles="xy", scale_units="xy", scale=1 / k, color="k",
-                  width=0.006, headwidth=3.5, headlength=4.5, headaxislength=4, zorder=45)
+                  width=style.arrow_width, headwidth=3.5, headlength=4.5, headaxislength=4, zorder=45,
+                  path_effects=ARROW_CASING if style.edge else None)
         radius = ELLIPSE_FRAC * (min(width, fit) if fit else width)
-        draw_ellipse(ax, result, center=(x.mean(), y.mean()), radius=radius, zorder=30)
-        draw_scale_bar(ax, scale_km)
-        draw_north_arrow(ax, loc=(0.085, 0.07))
+        draw_ellipse(ax, result, center=(x.mean(), y.mean()), radius=radius, zorder=30, style=style)
+        draw_scale_bar(ax, scale_km, style=style)
+        draw_north_arrow(ax, loc=(0.085, 0.07), style=style)
 
         ax_t = fig.add_subplot(gs[30:33, :22])
         ax_t.axis("off")
@@ -727,7 +825,7 @@ def _stations_union(tables):
 def network_map(results, tables, path=None, kind="symbol", basemap=DEFAULT_BASEMAP,
                 tile_source=None, dem_source=None, bounds=0.5, scale_km=None, tri_colors=None, lines=None,
                 velocities=True, min_strain=0.1, max_strain=None, zoom=None, title=None,
-                figsize=(15, 15), terrain_style=None, fit=True):
+                figsize=(15, 15), terrain_style=None, fit=True, visibility=False):
     """Several triangles on one map, like the 2021 Raton, NM figures.
 
     ``kind="symbol"`` draws each triangle's strain-rate symbol at its centroid;
@@ -743,11 +841,12 @@ def network_map(results, tables, path=None, kind="symbol", basemap=DEFAULT_BASEM
     colors = tri_colors or [TRI_COLORS[i % len(TRI_COLORS)] for i in range(len(results))]
     lines = (kind == "ellipse") if lines is None else lines
     stations = _stations_union(tables)
+    style = map_style(visibility)
     with plt.rc_context({"font.family": SERIF}):
         fig = plt.figure(figsize=figsize)
         ax = fig.add_axes([0.05, 0.04, 0.78, 0.9])
         setup_map(ax, stations, bounds, basemap, tile_source, zoom, dem_source=dem_source,
-                  terrain_style=terrain_style)
+                  terrain_style=terrain_style, style=style)
         width = ax.get_xlim()[1] - ax.get_xlim()[0]
         sx, sy = bm.lonlat_to_merc(stations["lon"].to_numpy(float), stations["lat"].to_numpy(float))
         if velocities:
@@ -755,9 +854,10 @@ def network_map(results, tables, path=None, kind="symbol", basemap=DEFAULT_BASEM
             vn = stations["vn"].to_numpy(float) * 1000
             k = 0.08 * width / max(np.hypot(ve, vn).max(), 1e-6)
             ax.quiver(sx, sy, ve, vn, angles="xy", scale_units="xy", scale=1 / k, color="k",
-                      width=0.006, headwidth=3.5, headlength=4.5, headaxislength=4, zorder=45)
+                      width=style.arrow_width, headwidth=3.5, headlength=4.5, headaxislength=4,
+                      zorder=45, path_effects=ARROW_CASING if style.edge else None)
         ax.scatter(sx, sy, s=90, c=[SITE_COLORS[i % len(SITE_COLORS)] for i in range(len(sx))],
-                   zorder=50, edgecolors="none")
+                   zorder=50, edgecolors="k" if style.edge else "none", linewidths=1.5 if style.edge else 0)
         for x0, y0, s in zip(sx, sy, stations["site"]):
             ax.annotate(s, (x0, y0), xytext=(6, 6), textcoords="offset points", fontsize=10,
                         zorder=51, path_effects=[patheffects.withStroke(linewidth=3, foreground="w")])
@@ -770,12 +870,18 @@ def network_map(results, tables, path=None, kind="symbol", basemap=DEFAULT_BASEM
             x, y = bm.lonlat_to_merc(t["lon"].to_numpy(float), t["lat"].to_numpy(float))
             cen = (x.mean(), y.mean())
             if lines:
-                ax.plot(np.append(x, x[0]), np.append(y, y[0]), color=c, ls="--", lw=2, alpha=0.6, zorder=20)
+                lx, ly = np.append(x, x[0]), np.append(y, y[0])
+                if style.edge:
+                    ax.plot(lx, ly, color="w", lw=style.triangle_lw + 3, alpha=0.8, zorder=19)
+                    ax.plot(lx, ly, color=c, ls=(0, (4, 2.5)), lw=style.triangle_lw - 0.5, zorder=20)
+                else:
+                    ax.plot(lx, ly, color=c, ls="--", lw=2, alpha=0.6, zorder=20)
             if kind == "ellipse":
                 rad = 0.06 * width
                 if fit:
                     rad = min(rad, ellipse_max_radius(r, x, y, exaggeration=kexag) or rad)
-                draw_ellipse(ax, r, center=cen, radius=rad, exaggeration=kexag, axis_lw=3, zorder=30)
+                draw_ellipse(ax, r, center=cen, radius=rad, exaggeration=kexag, axis_lw=3 + style.edge,
+                             zorder=30, style=style)
                 th = np.linspace(0, 2 * np.pi, 361)
                 E = (np.eye(2) + kexag * r.strain_tensor) @ np.vstack([np.cos(th), np.sin(th)])
                 ax.plot(cen[0] + rad * E[0], cen[1] + rad * E[1], color=c, lw=2, zorder=34)
@@ -788,8 +894,8 @@ def network_map(results, tables, path=None, kind="symbol", basemap=DEFAULT_BASEM
         leg = ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.01, 1.0),
                         prop={"family": SERIF, "size": 10}, title="Triangles", framealpha=0.9)
         leg.set_zorder(70)
-        draw_scale_bar(ax, scale_km)
-        draw_north_arrow(ax)
+        draw_scale_bar(ax, scale_km, style=style)
+        draw_north_arrow(ax, style=style)
         if title:
             ax.set_title(title, fontsize=20, pad=28)
         if path:
