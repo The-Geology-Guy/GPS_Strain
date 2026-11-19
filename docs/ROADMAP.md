@@ -33,10 +33,21 @@ Run `gps-strain P146 P149 P150 -o tahoe --format png` once on a normal connectio
 
    `usgs-relief` / `usgs-topo` tiles (public domain, US only) are already available as basemaps.
 4. Basemap licence decision (see `docs/research/04_costs.md`): Esri Location Platform key (free at this scale; terms silent on printing), or a Stadia paid plan for the exact Stamen look (print rights only clearly cover its static-map product, so email Stadia first).
-5. Second validation case from the GETSI Excel calculator and Tohoku results, at `https://cdn.serc.carleton.edu/files/getsi/teaching_materials/gps_strain/` (`gps_strain_calculator_excel.v3.xls`, `gps_strain_calculator_results.xlsx`). Cross-check against Strain_2D (`delaunay_flat`).
-6. Networks: Delaunay triangulation over many stations, skinny-triangle filter, strain map.
-7. Optional EarthScope/GAGE NAM14 source (free login and token).
-8. GitHub Actions CI on Linux, Mac and Windows; publish to PyPI.
+5. **GETSI Unit 6 (final project) support.** Unit 6 asks students to choose three adjacent NOTA stations in an actively straining area near people or infrastructure:
+   - all interior angles above ~30° and no side over 100 km (both now checked and warned about);
+   - map active faults from the USGS Quaternary Fault and Fold Database;
+   - compute strain, interpret it, and present tectonics, hazard, risk and mitigation in a 5–7 minute talk.
+
+   To add:
+   - a Qfaults overlay on both maps (reuse GEOSLAM's `sources/faults.py`, the USGS Qfaults REST service, no key);
+   - a "suggest triangles" helper that searches MIDAS stations near a point for valid triangles;
+   - a slide-ready export (PNG at 16:9).
+
+   The strain ellipse figure replaces the Wolfram CDF ellipse visualizer the unit relies on.
+6. Second validation case from the GETSI Excel calculator and Tohoku results, at `https://cdn.serc.carleton.edu/files/getsi/teaching_materials/gps_strain/` (`gps_strain_calculator_excel.v3.xls`, `gps_strain_calculator_results.xlsx`). Cross-check against Strain_2D (`delaunay_flat`).
+7. Networks: Delaunay triangulation over many stations, skinny-triangle filter, strain map.
+8. Optional EarthScope/GAGE NAM14 source (free login and token).
+9. GitHub Actions CI on Linux, Mac and Windows; publish to PyPI.
 
 ## gps-strain.org (web app)
 

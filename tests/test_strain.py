@@ -208,6 +208,14 @@ def test_monte_carlo_uncertainties_reasonable():
     assert 0 < r.mc["az1"] < 5
 
 
+def test_triangle_rule_warnings():
+    good = compute_strain(_cronin_latlon_table(), mc_samples=0)
+    assert not any("100 km" in w for w in good.warnings)  # Tahoe sides are 39-48 km
+    big = from_records([dict(site=s, lat=a, lon=o, ve=1, vn=1, sig_e=0.1, sig_n=0.1)
+                        for s, a, o in [("A", 39.0, -121.0), ("B", 40.5, -120.0), ("C", 39.0, -119.0)]])
+    assert any("100 km" in w for w in compute_strain(big, mc_samples=0).warnings)
+
+
 def test_report_runs():
     r = compute_strain(_cronin_latlon_table())
     text = r.report()

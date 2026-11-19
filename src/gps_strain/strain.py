@@ -303,6 +303,12 @@ def triangle_quality(x, y):
     return angles
 
 
+def triangle_sides_km(x, y):
+    """Side lengths (km) of a triangle; GETSI Unit 6 asks for none over 100 km."""
+    pts = np.column_stack([x, y])
+    return [float(np.linalg.norm(pts[(i + 1) % 3] - pts[i]) / 1000) for i in range(3)]
+
+
 def monte_carlo(params, cov, n=20000, seed=0):
     """1-sigma of derived quantities by sampling the parameter covariance."""
     rng = np.random.default_rng(seed)
@@ -365,6 +371,12 @@ def compute_strain(stations, frame: str = "enu", mc_samples: int = 20000) -> Str
             warnings.append(
                 f"smallest interior angle is {min(angles):.1f}°; Cronin & Resor advise "
                 "triangles with no angle below ~30° (results become unstable)."
+            )
+        sides = triangle_sides_km(xc, yc)
+        if max(sides) > 100:
+            warnings.append(
+                f"longest side is {max(sides):.0f} km; the GETSI Unit 6 project asks for "
+                "triangles with no side longer than 100 km."
             )
     span_km = np.hypot(np.ptp(xc), np.ptp(yc)) / 1000
     if span_km > 500:
