@@ -148,6 +148,19 @@ def test_water_is_masked_and_drawn_pale():
     assert g.min() >= terrain.DEFAULT_STYLE.dark - 1e-9 and g.max() <= terrain.DEFAULT_STYLE.light + 1e-9
 
 
+def test_water_mask_closes_dem_seams_across_a_lake():
+    """3DEP tile seams leave a small step between two flattened halves of a
+    lake (seen on Lake Tahoe); the seam must not show as land."""
+    ext = _merc_ext(-120.2, -119.9, 38.9, 39.3)
+    z = _plane(ext, 200, 200, 0.08, 0.05) + 3000
+    z[60:140, 40:100] = 1897.0
+    z[60:140, 100:160] = 1897.6        # other side of the seam
+    z[60:140, 99:101] = 1897.3         # resampled step
+    water = terrain.water_mask(z)
+    assert water[62:138, 42:158].all()
+    assert not water[:50].any() and not water[150:].any()
+
+
 def test_terrain_image_with_callable_source():
     ext = _merc_ext(-120.6, -119.9, 39.1, 39.7)
     img, credit = terrain.terrain_image(ext, source=terrain.synthetic_dem, target_px=400)

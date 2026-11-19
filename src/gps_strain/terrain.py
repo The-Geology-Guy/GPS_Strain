@@ -334,14 +334,30 @@ def _window_range(z, size=5):
     return sliding_window_view(hmax, size, axis=0).max(-1) - sliding_window_view(hmin, size, axis=0).min(-1)
 
 
-def water_mask(z: np.ndarray, flat_m: float = 0.01) -> np.ndarray:
-    """No-data cells, plus cells in a perfectly flat 5x5 neighbourhood (open
-    water: 3DEP lakes are hydro-flattened and Copernicus sea level is flat)."""
+def _window_max(mask: np.ndarray, size: int) -> np.ndarray:
+    """Boolean max filter (dilation) over a size x size window."""
+    from numpy.lib.stride_tricks import sliding_window_view
+
+    p = size // 2
+    m = np.pad(mask.astype(np.uint8), p, mode="edge")
+    m = sliding_window_view(m, size, axis=1).max(-1)
+    return sliding_window_view(m, size, axis=0).max(-1).astype(bool)
+
+
+def water_mask(z: np.ndarray, flat_m: float = 0.01, close_px: int = 13) -> np.ndarray:
+    """No-data cells, plus open water: cells in a perfectly flat 3x3
+    neighbourhood (3DEP lakes are hydro-flattened, Copernicus sea level is
+    flat). A binary closing then fills gaps up to ``close_px`` wide between
+    water areas: 3DEP tile seams leave a small elevation step across a lake,
+    which would otherwise show as a grey line through the water."""
     nan = ~np.isfinite(z)
     if nan.all():
         return nan
     zf = np.where(nan, np.nanmean(z), z)
-    return nan | (_window_range(zf) < flat_m)
+    water = nan | (_window_range(zf, 3) < flat_m)
+    if close_px > 1 and water.any() and not water.all():
+        water = ~_window_max(~_window_max(water, close_px), close_px)  # dilate, then erode
+    return water
 
 
 def lambert(z, extent_merc, style: HillshadeStyle = DEFAULT_STYLE) -> np.ndarray:

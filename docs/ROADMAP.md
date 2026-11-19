@@ -15,20 +15,17 @@
 - **Done:** the 2020 AC63 results table is reproduced to every printed digit in UTM mode. The 2020 strain algebra was right; its velocities were not.
 - **Done:** 36 tests, including exact reproduction of Cronin & Resor's worked example, a rigid-plate null test, offline map renders and the terrain pipeline (3DEP and Copernicus response formats, hillshade geometry, water mask).
 
-### Not yet verified live
+### Live tests
 
-The build sandbox has no network access to NGL, USGS or AWS. Untested against real servers:
+Run on a normal connection on 18 Nov 2026 (`gps-strain P146 P149 P150 -o tahoe`, `gps-strain AC63 AC62 AB37 -o alaska`, and Tahoe again with `--basemap hillshade-copernicus`):
 
-- the MIDAS download (`data.load_midas`);
-- the `.tenv3` loader;
-- the 3DEP and Copernicus downloads (`terrain.py`; the request and file formats are tested offline);
-- USGS tile fetching.
-
-Run `gps-strain P146 P149 P150 -o tahoe --format png` once on a normal connection, then regenerate `examples/AC63_*.png` and the Raton maps with real terrain.
+- **Working:** the MIDAS download and parse; USGS 3DEP terrain (CONUS and Alaska); Copernicus terrain.
+- **Fixed after that run:** 3DEP tile seams left a thin grey line across Lake Tahoe and Pyramid Lake; the water mask now closes such gaps.
+- **Not yet tested live:** the `.tenv3` loader and the USGS tile basemaps.
 
 ## Next steps (package)
 
-1. Live smoke test of MIDAS, `.tenv3`, 3DEP, Copernicus and USGS tiles. Add a real `midas.NA.txt` excerpt as a test fixture.
+1. Done (18 Nov 2026): live test of MIDAS, 3DEP and Copernicus. Still to do: `.tenv3` and USGS tiles; add a real `midas.NA.txt` excerpt as a test fixture.
 2. Logo: decided. No EarthScope logo; the sheets carry a block-letter "GPS STRAIN" wordmark (custom logos still possible with `--logo`).
 3. Done: grey DEM hillshade as the default printed-map terrain (decided 18 Nov 2026). An optional colour tint only if wanted later.
 4. Basemap licences: settled. The hillshade needs none; Esri and Stadia were removed. `docs/research/04_costs.md` is kept for the record.
