@@ -508,3 +508,81 @@ def strain_map(result: StrainResult, table, path=None, title=None, data_label="N
         if path:
             fig.savefig(path, dpi=150, edgecolor="k", bbox_inches="tight")
     return fig
+
+
+# ---------------------------------------------------------------------------
+# networks: several triangles on one map (the 2021 Raton, NM maps)
+# ---------------------------------------------------------------------------
+
+TRI_COLORS = ["m", "k", "r", "c", "b", "y", "g", "tab:orange", "tab:brown", "tab:pink"]
+
+
+def _stations_union(tables):
+    import pandas as pd
+
+    allt = pd.concat(tables, ignore_index=True)
+    return allt.drop_duplicates("site").reset_index(drop=True)
+
+
+def network_map(results, tables, path=None, kind="symbol", basemap="esri-terrain", api_key=None,
+                tile_source=None, bounds=0.5, scale_km=None, tri_colors=None, lines=None,
+                velocities=True, min_strain=0.1, max_strain=None, zoom=None, title=None,
+                figsize=(15, 15)):
+    """Several triangles on one map, like the 2021 Raton, NM figures.
+
+    ``kind="symbol"`` draws each triangle's strain-rate symbol at its centroid;
+    ``kind="ellipse"`` draws each triangle's strain ellipse (outlined in the
+    triangle's colour) with the dashed triangle. All symbols/ellipses share one
+    scale, so sizes are comparable between triangles. Station velocity arrows
+    are drawn once per station.
+    """
+    if len(results) != len(tables):
+        raise ValueError("results and tables must have the same length")
+    colors = tri_colors or [TRI_COLORS[i % len(TRI_COLORS)] for i in range(len(results))]
+    lines = (kind == "ellipse") if lines is None else lines
+    stations = _stations_union(tables)
+    with plt.rc_context({"font.family": SERIF}):
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_axes([0.05, 0.04, 0.78, 0.9])
+        setup_map(ax, stations, bounds, basemap, api_key, tile_source, zoom)
+        width = ax.get_xlim()[1] - ax.get_xlim()[0]
+        sx, sy = bm.lonlat_to_merc(stations["lon"].to_numpy(float), stations["lat"].to_numpy(float))
+        if velocities:
+            ve = stations["ve"].to_numpy(float) * 1000
+            vn = stations["vn"].to_numpy(float) * 1000
+            k = 0.08 * width / max(np.hypot(ve, vn).max(), 1e-6)
+            ax.quiver(sx, sy, ve, vn, angles="xy", scale_units="xy", scale=1 / k, color="k",
+                      width=0.006, headwidth=3.5, headlength=4.5, headaxislength=4, zorder=45)
+        ax.scatter(sx, sy, s=90, c=[SITE_COLORS[i % len(SITE_COLORS)] for i in range(len(sx))],
+                   zorder=50, edgecolors="none")
+        for x0, y0, s in zip(sx, sy, stations["site"]):
+            ax.annotate(s, (x0, y0), xytext=(6, 6), textcoords="offset points", fontsize=10,
+                        zorder=51, path_effects=[patheffects.withStroke(linewidth=3, foreground="w")])
+
+        emax = max(max(abs(r.e1), abs(r.e2)) for r in results)
+        kexag = 0.25 / max(emax, 1e-30)
+        mmax = max_strain or max(emax * NANO, min_strain * 10)
+        handles = []
+        for r, t, c in zip(results, tables, colors):
+            x, y = bm.lonlat_to_merc(t["lon"].to_numpy(float), t["lat"].to_numpy(float))
+            cen = (x.mean(), y.mean())
+            if lines:
+                ax.plot(np.append(x, x[0]), np.append(y, y[0]), color=c, ls="--", lw=2, alpha=0.6, zorder=20)
+            if kind == "ellipse":
+                draw_ellipse(ax, r, center=cen, radius=0.06 * width, exaggeration=kexag, axis_lw=3, zorder=30)
+                th = np.linspace(0, 2 * np.pi, 361)
+                E = (np.eye(2) + kexag * r.strain_tensor) @ np.vstack([np.cos(th), np.sin(th)])
+                ax.plot(cen[0] + 0.06 * width * E[0], cen[1] + 0.06 * width * E[1], color=c, lw=2, zorder=34)
+            else:
+                draw_strain_symbol(ax, r, cen, 0.12 * width, min_strain, mmax)
+            handles.append(Line2D([0], [0], color=c, ls="--", lw=2, label="–".join(r.sites)))
+        leg = ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.01, 1.0),
+                        prop={"family": SERIF, "size": 10}, title="Triangles", framealpha=0.9)
+        leg.set_zorder(70)
+        draw_scale_bar(ax, scale_km)
+        draw_north_arrow(ax)
+        if title:
+            ax.set_title(title, fontsize=20, pad=28)
+        if path:
+            fig.savefig(path, dpi=150, bbox_inches="tight")
+    return fig

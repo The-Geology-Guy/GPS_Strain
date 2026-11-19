@@ -16,6 +16,8 @@ Give it three or more stations and it reports the following, then draws the two 
 <p align="center"><img src="examples/AC63_symbol.png" width="800"/></p>
 <p align="center"><img src="examples/AC63_strain.png" width="600"/></p>
 
+<p align="center"><img src="examples/raton_network_ellipse.png" width="600"/></p>
+
 <sub>Example images were rendered offline with the synthetic preview basemap. With network access the default basemap is Esri World Terrain Base.</sub>
 
 ## Install
@@ -47,6 +49,9 @@ gps-strain --near 38.22 -122.31 --radius 30
 # your own velocities (mm/yr): columns site, lat, lon, ve, vn, sig_e, sig_n
 gps-strain --table examples/cronin_example.csv -o example
 
+# several triangles on one map (like the 2021 Raton, NM study)
+gps-strain --triangles RG24,P036,P039 P070,P039,RG24 P123,RG13,RG24 -o raton
+
 # reproduce the classic GETSI spreadsheet (UTM) instead of the local ENU frame
 gps-strain --table examples/cronin_example.csv --frame utm
 ```
@@ -63,7 +68,10 @@ print(r.report())
 r.e1, r.e2, r.azimuth_s1, r.max_shear, r.rotation, r.sigma, r.mc
 plotting.symbol_map(r, sta, "symbol.pdf", logo="earthscope_logo.png")
 plotting.strain_map(r, sta, "strain.pdf", basemap="stadia-terrain-background")
+plotting.network_map([r1, r2, r3], [t1, t2, t3], "network.pdf", kind="ellipse")  # or kind="symbol"
 ```
+
+Original 2020–2021 figures, for comparison, are in [docs/reference_2020/](docs/reference_2020/).
 
 ## Basemaps
 

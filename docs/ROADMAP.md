@@ -10,8 +10,10 @@
   - `plotting.strain_map`: portrait velocity and strain-ellipse map with tables.
 
   Basemaps come from web-map tiles (`basemap.py`): Esri World Terrain (default), Stadia/Stamen terrain-background (needs a key), and others, plus an offline synthetic preview. A logo slot takes any image file or URL.
+- **Done:** `plotting.network_map`: several triangles on one map (symbol or ellipse), like the 2021 Raton, NM figures, plus `gps-strain --triangles`.
 - **Done:** command-line tool `gps-strain`.
-- **Done:** 21 tests, including exact reproduction of Cronin & Resor's worked example, a rigid-plate null test and an offline map-render test.
+- **Done:** the 2020 AC63 results table is reproduced to every printed digit in UTM mode. The 2020 strain algebra was right; its velocities were not.
+- **Done:** 23 tests, including exact reproduction of Cronin & Resor's worked example, a rigid-plate null test and an offline map-render test.
 
 ### Not yet verified live
 
@@ -45,7 +47,7 @@ Run `gps-strain P146 P149 P150 -o tahoe --format png` once on a normal connectio
 
    The strain ellipse figure replaces the Wolfram CDF ellipse visualizer the unit relies on.
 6. Second validation case from the GETSI Excel calculator and Tohoku results, at `https://cdn.serc.carleton.edu/files/getsi/teaching_materials/gps_strain/` (`gps_strain_calculator_excel.v3.xls`, `gps_strain_calculator_results.xlsx`). Cross-check against Strain_2D (`delaunay_flat`).
-7. Networks: Delaunay triangulation over many stations, skinny-triangle filter, strain map.
+7. Networks: automatic Delaunay triangulation over many stations with a skinny/oversized-triangle filter, feeding `network_map` (which already draws hand-picked triangles).
 8. Optional EarthScope/GAGE NAM14 source (free login and token).
 9. GitHub Actions CI on Linux, Mac and Windows; publish to PyPI.
 

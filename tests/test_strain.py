@@ -216,6 +216,27 @@ def test_triangle_rule_warnings():
     assert any("100 km" in w for w in compute_strain(big, mc_samples=0).warnings)
 
 
+def test_matches_2020_ac63_results_table():
+    """The 2020 package's AC63 table (its velocities, sigma 0.01 mm/yr) in UTM mode.
+
+    Reproduces every printed digit: the 2020 strain algebra was right; its
+    velocities (mean displacement / years) were not.
+    """
+    t = from_records([
+        dict(site="AC63", lat=63.502426, lon=-145.847246, ve=2.626487, vn=-1.008585, sig_e=0.01, sig_n=0.01),
+        dict(site="AC62", lat=63.083606, lon=-146.312695, ve=-8.66512, vn=3.464374, sig_e=0.01, sig_n=0.01),
+        dict(site="AB37", lat=62.967322, lon=-145.451877, ve=-9.815231, vn=5.922223, sig_e=0.01, sig_n=0.01),
+    ])
+    r = compute_strain(t, frame="utm", mc_samples=0)
+    assert r.e1 * 1e9 == pytest.approx(107.7997, abs=1e-3)
+    assert r.e2 * 1e9 == pytest.approx(-179.7254, abs=1e-3)
+    assert r.azimuth_s1 == pytest.approx(59.9833, abs=1e-3)
+    assert r.max_shear * 1e9 == pytest.approx(287.525, abs=1e-3)
+    assert r.area_strain * 1e9 == pytest.approx(-71.9257, abs=1e-3)
+    assert r.rotation * 1e9 == pytest.approx(-98.4306, abs=1e-3)
+    assert r.translation_azimuth == pytest.approx(297.8543, abs=1e-3)
+
+
 def test_report_runs():
     r = compute_strain(_cronin_latlon_table())
     text = r.report()
@@ -259,3 +280,9 @@ def test_maps_render_offline(tmp_path):
     plotting.strain_map(r, t, tmp_path / "m.png", basemap="synthetic")
     assert (tmp_path / "s.png").stat().st_size > 10000
     assert (tmp_path / "m.png").stat().st_size > 10000
+    t2 = t.copy()
+    t2["lon"] = t2["lon"] + 0.4
+    r2 = compute_strain(t2, mc_samples=0)
+    for kind in ("symbol", "ellipse"):
+        plotting.network_map([r, r2], [t, t2], tmp_path / f"n_{kind}.png", kind=kind, basemap="synthetic")
+        assert (tmp_path / f"n_{kind}.png").stat().st_size > 10000
